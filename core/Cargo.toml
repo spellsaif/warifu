@@ -9,3 +9,6 @@ data-encoding = "2.6"
 zeroize = { version = "1.8", features = ["derive"] }
 subtle = "2.6"
 thiserror = "1.0"
+url = "2.5"
+prost = "0.13"
+percent-encoding = "2.3"
