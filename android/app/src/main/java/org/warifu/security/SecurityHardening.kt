@@ -1,4 +1,4 @@
-package org.warifu.platform.android.security
+package org.warifu.security
 
 import android.app.Activity
 import android.content.ClipData
