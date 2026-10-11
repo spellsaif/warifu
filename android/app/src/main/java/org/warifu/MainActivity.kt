@@ -76,11 +76,7 @@ class MainActivity : FragmentActivity() {
                         QrScannerScreen(
                             onQrCodeDetected = { scannedText ->
                                 isScanningQr = false
-                                if (scannedText.startsWith("otpauth-migration://")) {
-                                    viewModel.importGoogleMigration(scannedText)
-                                } else {
-                                    viewModel.addTokenFromUri(scannedText)
-                                }
+                                handleIncomingTokenUri(scannedText)
                             },
                             onCloseClicked = { isScanningQr = false }
                         )
@@ -94,11 +90,25 @@ class MainActivity : FragmentActivity() {
                             onDeleteToken = { id -> viewModel.deleteToken(id) },
                             onScanQrClicked = { checkCameraPermissionAndScan() },
                             onImportGoogleClicked = { checkCameraPermissionAndScan() },
+                            onManualAddUri = { inputUri -> handleIncomingTokenUri(inputUri) },
                             onLockClicked = { viewModel.lockVault() }
                         )
                     }
                 }
             }
+        }
+    }
+
+    private fun handleIncomingTokenUri(rawText: String) {
+        val trimmed = rawText.trim()
+        if (trimmed.startsWith("otpauth-migration://") || trimmed.startsWith("otpauth-migration:")) {
+            viewModel.importGoogleMigration(trimmed)
+        } else if (trimmed.startsWith("otpauth://")) {
+            viewModel.addTokenFromUri(trimmed)
+        } else {
+            val sanitized = trimmed.replace(" ", "").uppercase()
+            val uri = "otpauth://totp/Warifu:Account?secret=$sanitized&issuer=Warifu"
+            viewModel.addTokenFromUri(uri)
         }
     }
 
@@ -125,56 +135,68 @@ class MainActivity : FragmentActivity() {
                 Toast.makeText(this, "Vault initialized and secured with hardware keys", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
-            Toast.makeText(this, "Vault creation error: ${e.message}", Toast.LENGTH_LONG).show()
+            val errMsg = e.localizedMessage ?: e.message ?: e.javaClass.simpleName
+            Toast.makeText(this, "Vault creation error: $errMsg", Toast.LENGTH_LONG).show()
         }
     }
 
     private fun promptBiometricUnlock() {
-        if (!wrappedKeyFile.exists()) {
+        if (!wrappedKeyFile.exists() || !vaultFile.exists()) {
             Toast.makeText(this, "No vault found", Toast.LENGTH_SHORT).show()
             return
         }
 
-        val wrappedKeyPayload = wrappedKeyFile.readBytes()
-        val cryptoObject = try {
-            keystoreManager.createBiometricDecryptCryptoObject(wrappedKeyPayload)
+        val wrappedKeyPayload = try {
+            wrappedKeyFile.readBytes()
         } catch (e: Exception) {
-            Toast.makeText(this, "Hardware keystore error: ${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Failed to read vault key: ${e.localizedMessage ?: e.javaClass.simpleName}", Toast.LENGTH_SHORT).show()
             return
         }
 
-        val executor = ContextCompat.getMainExecutor(this)
-        val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Unlock Warifu")
-            .setSubtitle("Confirm biometrics to unwrap hardware keys")
-            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
-            .setNegativeButtonText("Cancel")
-            .build()
+        val biometricManager = BiometricManager.from(this)
+        val canAuth = biometricManager.canAuthenticate(
+            BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+        )
 
-        val biometricPrompt = BiometricPrompt(this, executor, object : BiometricPrompt.AuthenticationCallback() {
-            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                super.onAuthenticationSucceeded(result)
-                val authenticatedCrypto = result.cryptoObject
-                if (authenticatedCrypto != null) {
+        if (canAuth == BiometricManager.BIOMETRIC_SUCCESS) {
+            val executor = ContextCompat.getMainExecutor(this)
+            val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Unlock Warifu")
+                .setSubtitle("Confirm biometrics or device PIN to access your vault")
+                .setAllowedAuthenticators(
+                    BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                )
+                .build()
+
+            val biometricPrompt = BiometricPrompt(this, executor, object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
                     try {
-                        // 1. Hardware unwrapping of Vault Key inside TEE/StrongBox
-                        val unwrappedKey = keystoreManager.unwrapVaultKey(authenticatedCrypto, wrappedKeyPayload)
-
-                        // 2. Pass unwrapped key to Rust Core
+                        val unwrappedKey = keystoreManager.unwrapVaultKey(wrappedKeyPayload)
                         viewModel.unlockWithVaultKey(unwrappedKey, vaultFile.absolutePath)
                     } catch (e: Exception) {
-                        Toast.makeText(this@MainActivity, "Decryption failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                        val errMsg = e.localizedMessage ?: e.message ?: e.javaClass.simpleName
+                        Toast.makeText(this@MainActivity, "Decryption failed: $errMsg", Toast.LENGTH_SHORT).show()
                     }
                 }
-            }
 
-            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                super.onAuthenticationError(errorCode, errString)
-                Toast.makeText(this@MainActivity, "Auth canceled: $errString", Toast.LENGTH_SHORT).show()
-            }
-        })
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    Toast.makeText(this@MainActivity, "Auth canceled: $errString", Toast.LENGTH_SHORT).show()
+                }
+            })
 
-        biometricPrompt.authenticate(promptInfo, cryptoObject)
+            biometricPrompt.authenticate(promptInfo)
+        } else {
+            // If device has no biometrics or screen lock enrolled, unwrap directly
+            try {
+                val unwrappedKey = keystoreManager.unwrapVaultKey(wrappedKeyPayload)
+                viewModel.unlockWithVaultKey(unwrappedKey, vaultFile.absolutePath)
+            } catch (e: Exception) {
+                val errMsg = e.localizedMessage ?: e.message ?: e.javaClass.simpleName
+                Toast.makeText(this, "Unlock failed: $errMsg", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     override fun onStop() {
