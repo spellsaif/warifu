@@ -22,3 +22,6 @@ libc = "0.2"
 getrandom = "0.2"
 uuid = { version = "1.8", features = ["v4"] }
 uniffi = { version = "0.28", features = ["cli"] }
+
+[dev-dependencies]
+proptest = "1.5"

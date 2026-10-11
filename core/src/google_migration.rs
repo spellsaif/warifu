@@ -97,9 +97,12 @@ pub fn parse_google_migration_uri(uri_str: &str) -> Result<Vec<ParsedToken>, Goo
 
     let raw_b64 = data_param.ok_or(GoogleMigrationError::MissingDataParameter)?;
 
+    // Handle both strict percent-encoded (+ as %2B) and unencoded query strings (+ parsed as space)
+    let sanitized_b64 = raw_b64.replace(' ', "+");
+
     // Base64 decode raw bytes
     let payload_bytes = BASE64
-        .decode(raw_b64.as_bytes())
+        .decode(sanitized_b64.as_bytes())
         .map_err(|_| GoogleMigrationError::Base64DecodeFailed)?;
 
     // Decode Protobuf
@@ -203,7 +206,9 @@ pub fn encode_google_migration_uri(tokens: &[ParsedToken]) -> String {
     payload.encode(&mut buf).unwrap();
 
     let b64 = BASE64.encode(&buf);
-    format!("otpauth-migration://offline?data={}", b64)
+    let mut url = Url::parse("otpauth-migration://offline").unwrap();
+    url.query_pairs_mut().append_pair("data", &b64);
+    url.to_string()
 }
 
 #[cfg(test)]

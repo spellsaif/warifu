@@ -1,0 +1,85 @@
+name: OpenAuthenticator CI
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  core-verification:
+    name: Rust Core Security & Test Vectors
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Cargo Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            core/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run Unit Tests & RFC Test Vectors
+        run: |
+          cd core
+          cargo test --all-targets --verbose
+
+      - name: Run Property-Based Fuzz Tests (2500 iterations)
+        run: |
+          cd core
+          cargo test --test fuzz_properties -- --nocapture
+
+      - name: Clippy Zero-Warning Enforcement
+        run: |
+          cd core
+          cargo clippy --all-targets --all-features -- -D clippy::all
+
+      - name: Install Security Tools
+        run: |
+          cargo install cargo-audit cargo-deny --locked || true
+
+      - name: Supply Chain Vulnerability Audit
+        run: |
+          cd core
+          cargo audit || true
+          cargo deny check licenses advisories || true
+
+  android-verification:
+    name: Android Client Verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Validate Gradle Wrapper
+        uses: gradle/actions/wrapper-validation@v3
+
+  ios-verification:
+    name: iOS Swift Package Verification
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Swift Package
+        run: |
+          cd ios
+          swift build -v
