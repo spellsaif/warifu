@@ -1,5 +1,6 @@
 package org.warifu.ui.screens
 
+import android.graphics.ImageFormat
 import android.view.ViewGroup
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -40,6 +41,15 @@ fun QrScannerScreen(
     var isTorchEnabled by remember { mutableStateOf(false) }
     var hasDetectedCode by remember { mutableStateOf(false) }
 
+    val mainExecutor = remember { ContextCompat.getMainExecutor(context) }
+    val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            cameraExecutor.shutdown()
+        }
+    }
+
     Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
         AndroidView(
             factory = { ctx ->
@@ -52,29 +62,30 @@ fun QrScannerScreen(
 
                 val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
                 cameraProviderFuture.addListener({
-                    val cameraProvider = cameraProviderFuture.get()
-                    val preview = Preview.Builder().build().also {
-                        it.setSurfaceProvider(previewView.surfaceProvider)
-                    }
-
-                    val imageAnalyzer = ImageAnalysis.Builder()
-                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                        .build()
-                        .also { analysis ->
-                            analysis.setAnalyzer(
-                                Executors.newSingleThreadExecutor(),
-                                QrCodeAnalyzer { result ->
-                                    if (!hasDetectedCode) {
-                                        hasDetectedCode = true
-                                        onQrCodeDetected(result)
-                                    }
-                                }
-                            )
+                    try {
+                        val cameraProvider = cameraProviderFuture.get()
+                        val preview = Preview.Builder().build().also {
+                            it.setSurfaceProvider(previewView.surfaceProvider)
                         }
 
-                    val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+                        val imageAnalyzer = ImageAnalysis.Builder()
+                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                            .build()
+                            .also { analysis ->
+                                analysis.setAnalyzer(
+                                    cameraExecutor,
+                                    QrCodeAnalyzer { result ->
+                                        if (!hasDetectedCode) {
+                                            hasDetectedCode = true
+                                            mainExecutor.execute {
+                                                onQrCodeDetected(result)
+                                            }
+                                        }
+                                    }
+                                )
+                            }
 
-                    try {
+                        val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
                         cameraProvider.unbindAll()
                         val camera = cameraProvider.bindToLifecycle(
                             lifecycleOwner,
@@ -86,7 +97,7 @@ fun QrScannerScreen(
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
-                }, ContextCompat.getMainExecutor(ctx))
+                }, mainExecutor)
 
                 previewView
             },
@@ -143,7 +154,7 @@ fun QrScannerScreen(
 }
 
 /**
- * High-performance, offline QR code frame analyzer using ZXing.
+ * High-performance, crash-safe offline QR code frame analyzer using ZXing.
  */
 private class QrCodeAnalyzer(
     private val onQrCodeFound: (String) -> Unit
@@ -158,14 +169,37 @@ private class QrCodeAnalyzer(
     }
 
     override fun analyze(image: ImageProxy) {
-        if (image.format == ImageFormat.YUV_420_888 || image.format == ImageFormat.YUV_422_888 || image.format == ImageFormat.YUV_444_888) {
-            val buffer = image.planes[0].buffer
-            val data = buffer.toByteArray()
-            val height = image.height
+        try {
+            val yPlane = image.planes.getOrNull(0)
+            if (yPlane == null) {
+                image.close()
+                return
+            }
+
+            val yBuffer = yPlane.buffer
+            val rowStride = yPlane.rowStride
             val width = image.width
+            val height = image.height
+
+            // Extract contiguous luminance bytes, properly handling rowStride padding
+            val yData = ByteArray(width * height)
+            if (rowStride == width) {
+                yBuffer.position(0)
+                yBuffer.get(yData, 0, minOf(yBuffer.remaining(), width * height))
+            } else {
+                val rowBuffer = ByteArray(width)
+                for (row in 0 until height) {
+                    val pos = row * rowStride
+                    if (pos + width <= yBuffer.limit()) {
+                        yBuffer.position(pos)
+                        yBuffer.get(rowBuffer, 0, width)
+                        System.arraycopy(rowBuffer, 0, yData, row * width, width)
+                    }
+                }
+            }
 
             val source = PlanarYUVLuminanceSource(
-                data,
+                yData,
                 width,
                 height,
                 0,
@@ -175,27 +209,17 @@ private class QrCodeAnalyzer(
                 false
             )
             val binaryBitmap = BinaryBitmap(HybridBinarizer(source))
-
+            val result = reader.decodeWithState(binaryBitmap)
+            onQrCodeFound(result.text)
+        } catch (_: NotFoundException) {
+            // Normal: frame does not contain a QR code
+        } catch (e: Exception) {
+            // Silently ignore decode issues on corrupt or motion-blurred frames
+        } finally {
             try {
-                val result = reader.decodeWithState(binaryBitmap)
-                onQrCodeFound(result.text)
-            } catch (_: NotFoundException) {
-                // Normal when frame has no QR code
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
                 reader.reset()
-                image.close()
-            }
-        } else {
+            } catch (_: Exception) {}
             image.close()
         }
-    }
-
-    private fun ByteBuffer.toByteArray(): ByteArray {
-        rewind()
-        val data = ByteArray(remaining())
-        get(data)
-        return data
     }
 }
