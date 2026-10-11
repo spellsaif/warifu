@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Pin
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -25,6 +26,7 @@ fun TokenCard(
     isConcealed: Boolean,
     onToggleConceal: () -> Unit,
     onCopyCode: (String) -> Unit,
+    onDelete: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -42,7 +44,7 @@ fun TokenCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Header: Issuer, Account, Pinned indicator
+            // Header: Issuer, Account, Pinned indicator, Delete
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -62,13 +64,30 @@ fun TokenCard(
                     )
                 }
 
-                if (token.isPinned) {
-                    Icon(
-                        imageVector = Icons.Default.Pin,
-                        contentDescription = "Pinned",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
-                    )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (token.isPinned) {
+                        Icon(
+                            imageVector = Icons.Default.Pin,
+                            contentDescription = "Pinned",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteOutline,
+                            contentDescription = "Delete account",
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
 

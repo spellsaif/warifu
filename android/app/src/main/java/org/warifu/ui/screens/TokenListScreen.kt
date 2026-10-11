@@ -30,16 +30,53 @@ fun TokenListScreen(
     onImportGoogleClicked: () -> Unit,
     onManualAddUri: (String) -> Unit,
     onLockClicked: () -> Unit,
+    showManualInputDialog: Boolean = false,
+    onManualInputDialogChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
-    var showManualInputDialog by remember { mutableStateOf(false) }
+    var internalShowManualInputDialog by remember { mutableStateOf(false) }
+    val isManualDialogVisible = showManualInputDialog || internalShowManualInputDialog
     var manualUriText by remember { mutableStateOf("") }
+    var tokenToDelete by remember { mutableStateOf<uniffi.warifu_core.TokenView?>(null) }
 
-    if (showManualInputDialog) {
+    tokenToDelete?.let { token ->
+        AlertDialog(
+            onDismissRequest = { tokenToDelete = null },
+            title = {
+                Text("Delete 2FA Account?", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(
+                    "Are you sure you want to remove \"${token.issuer.ifEmpty { token.accountName }}\"? " +
+                    "Ensure you have a secondary backup before deleting or you may lose access.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDeleteToken(token.id)
+                        tokenToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.onError)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { tokenToDelete = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (isManualDialogVisible) {
         AlertDialog(
             onDismissRequest = {
-                showManualInputDialog = false
+                internalShowManualInputDialog = false
+                onManualInputDialogChange(false)
                 manualUriText = ""
             },
             title = {
@@ -68,7 +105,8 @@ fun TokenListScreen(
                     onClick = {
                         if (manualUriText.isNotBlank()) {
                             onManualAddUri(manualUriText.trim())
-                            showManualInputDialog = false
+                            internalShowManualInputDialog = false
+                            onManualInputDialogChange(false)
                             manualUriText = ""
                         }
                     }
@@ -79,7 +117,8 @@ fun TokenListScreen(
             dismissButton = {
                 TextButton(
                     onClick = {
-                        showManualInputDialog = false
+                        internalShowManualInputDialog = false
+                        onManualInputDialogChange(false)
                         manualUriText = ""
                     }
                 ) {
@@ -143,7 +182,8 @@ fun TokenListScreen(
                             leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
                             onClick = {
                                 showMenu = false
-                                showManualInputDialog = true
+                                internalShowManualInputDialog = true
+                                onManualInputDialogChange(true)
                             }
                         )
                         HorizontalDivider()
@@ -281,7 +321,8 @@ fun TokenListScreen(
                             token = token,
                             isConcealed = state.areCodesConcealed,
                             onToggleConceal = onToggleConceal,
-                            onCopyCode = onCopyCode
+                            onCopyCode = onCopyCode,
+                            onDelete = { tokenToDelete = token }
                         )
                     }
                 }
