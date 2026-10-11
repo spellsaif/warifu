@@ -123,7 +123,8 @@ class AuthViewModel : ViewModel() {
             _uiState.update { it.copy(statusMessage = "Account added successfully") }
             true
         } catch (e: Exception) {
-            _uiState.update { it.copy(statusMessage = "Invalid QR code: ${e.message}") }
+            val errMsg = e.localizedMessage ?: e.message ?: e.javaClass.simpleName
+            _uiState.update { it.copy(statusMessage = "Invalid QR code: $errMsg") }
             false
         }
     }
@@ -136,7 +137,8 @@ class AuthViewModel : ViewModel() {
             _uiState.update { it.copy(statusMessage = "Imported $count accounts from Google") }
             count
         } catch (e: Exception) {
-            _uiState.update { it.copy(statusMessage = "Google Import failed: ${e.message}") }
+            val errMsg = e.localizedMessage ?: e.message ?: e.javaClass.simpleName
+            _uiState.update { it.copy(statusMessage = "Google Import failed: $errMsg") }
             0
         }
     }
@@ -146,7 +148,8 @@ class AuthViewModel : ViewModel() {
         return try {
             currentSession.exportGoogleMigration()
         } catch (e: Exception) {
-            _uiState.update { it.copy(statusMessage = "Export failed: ${e.message}") }
+            val errMsg = e.localizedMessage ?: e.message ?: e.javaClass.simpleName
+            _uiState.update { it.copy(statusMessage = "Export failed: $errMsg") }
             null
         }
     }
@@ -157,7 +160,8 @@ class AuthViewModel : ViewModel() {
             currentSession.removeToken(id)
             refreshTokens()
         } catch (e: Exception) {
-            _uiState.update { it.copy(statusMessage = "Failed to delete: ${e.message}") }
+            val errMsg = e.localizedMessage ?: e.message ?: e.javaClass.simpleName
+            _uiState.update { it.copy(statusMessage = "Failed to delete: $errMsg") }
         }
     }
 
