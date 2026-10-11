@@ -41,7 +41,8 @@ class AuthViewModel : ViewModel() {
             refreshTokens()
             true
         } catch (e: Exception) {
-            _uiState.update { it.copy(statusMessage = "Unlock failed: ${e.message}") }
+            val errMsg = e.localizedMessage ?: e.message ?: e.javaClass.simpleName
+            _uiState.update { it.copy(statusMessage = "Unlock failed: $errMsg") }
             false
         }
     }
@@ -55,7 +56,8 @@ class AuthViewModel : ViewModel() {
             refreshTokens()
             true
         } catch (e: Exception) {
-            _uiState.update { it.copy(statusMessage = "Vault creation failed: ${e.message}") }
+            val errMsg = e.localizedMessage ?: e.message ?: e.javaClass.simpleName
+            _uiState.update { it.copy(statusMessage = "Vault creation failed: $errMsg") }
             false
         }
     }
