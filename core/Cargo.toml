@@ -12,3 +12,8 @@ thiserror = "1.0"
 url = "2.5"
 prost = "0.13"
 percent-encoding = "2.3"
+chacha20poly1305 = { version = "0.10", features = ["alloc"] }
+argon2 = { version = "0.5", features = ["alloc", "rand"] }
+libc = "0.2"
+getrandom = "0.2"
+uuid = { version = "1.8", features = ["v4"] }
