@@ -1,10 +1,9 @@
-package org.warifu.platform.android.security
+package org.warifu.security
 
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.security.keystore.StrongBoxUnavailableException
-import androidx.biometric.BiometricPrompt
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -14,10 +13,10 @@ import javax.crypto.spec.GCMParameterSpec
 /**
  * Manages hardware-backed Key Encryption Keys (KEK) inside Android KeyStore.
  *
- * Implements hardware biometric binding:
+ * Implements hardware security binding:
  * - Backed by StrongBox Keymaster (dedicated physical security chip) with graceful fallback to TEE (TrustZone).
- * - Requires physical user presence via `AUTH_BIOMETRIC_STRONG`.
- * - Decryption can ONLY succeed when gated through a hardware `BiometricPrompt.CryptoObject`.
+ * - Master keys are generated and stored exclusively within the hardware keystore.
+ * - Hardware key wraps the 256-bit vault key via AES-256-GCM.
  */
 class HardwareKeystoreManager {
 
@@ -39,11 +38,12 @@ class HardwareKeystoreManager {
     fun hasMasterKey(): Boolean = keyStore.containsAlias(MASTER_KEK_ALIAS)
 
     /**
-     * Generates an AES-256 key inside StrongBox or TEE gated by biometric authentication.
+     * Retrieves existing or generates a new AES-256 hardware master key.
      */
     fun getOrCreateMasterKey(): SecretKey {
         if (hasMasterKey()) {
-            return keyStore.getKey(MASTER_KEK_ALIAS, null) as SecretKey
+            val key = keyStore.getKey(MASTER_KEK_ALIAS, null) as? SecretKey
+            if (key != null) return key
         }
 
         return generateHardwareKey(attemptStrongBox = true)
@@ -62,15 +62,6 @@ class HardwareKeystoreManager {
             .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
             .setKeySize(256)
-            .setUserAuthenticationRequired(true)
-
-        // Require strong biometrics (Class 3 / Hardware Biometric)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            builder.setUserAuthenticationParameters(
-                0, // 0 = Timeout expires immediately after cryptographic operation
-                KeyProperties.AUTH_BIOMETRIC_STRONG
-            )
-        }
 
         // Attempt StrongBox hardware security chip on devices that support it (Android 9+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && attemptStrongBox) {
@@ -79,11 +70,8 @@ class HardwareKeystoreManager {
                 keyGenerator.init(builder.build())
                 return keyGenerator.generateKey()
             } catch (e: Exception) {
-                if (e is StrongBoxUnavailableException || e.cause is StrongBoxUnavailableException) {
-                    // Fallback to standard TEE (TrustZone)
-                    return generateHardwareKey(attemptStrongBox = false)
-                }
-                throw e
+                // Fallback to standard TEE (TrustZone) if StrongBox is unavailable
+                return generateHardwareKey(attemptStrongBox = false)
             }
         }
 
@@ -113,34 +101,18 @@ class HardwareKeystoreManager {
     }
 
     /**
-     * Prepares an uninitialized Cipher for the BiometricPrompt.
-     *
-     * The OS Keystore validates the user's fingerprint/face before authorizing the Cipher to decrypt.
+     * Unwraps (decrypts) the 256-bit Vault Key using the hardware KEK.
      */
-    fun createBiometricDecryptCryptoObject(wrappedKeyPayload: ByteArray): BiometricPrompt.CryptoObject {
+    fun unwrapVaultKey(wrappedKeyPayload: ByteArray): ByteArray {
         require(wrappedKeyPayload.size > GCM_IV_LENGTH_BYTES) { "Invalid wrapped key payload" }
 
-        val kek = keyStore.getKey(MASTER_KEK_ALIAS, null) as SecretKey
+        val kek = getOrCreateMasterKey()
         val iv = ByteArray(GCM_IV_LENGTH_BYTES)
         System.arraycopy(wrappedKeyPayload, 0, iv, 0, GCM_IV_LENGTH_BYTES)
 
         val spec = GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv)
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.DECRYPT_MODE, kek, spec)
-
-        return BiometricPrompt.CryptoObject(cipher)
-    }
-
-    /**
-     * Unwraps (decrypts) the 256-bit Vault Key using the authenticated CryptoObject.
-     *
-     * This method can ONLY be called inside `BiometricPrompt.AuthenticationCallback.onAuthenticationSucceeded()`.
-     */
-    fun unwrapVaultKey(
-        cryptoObject: BiometricPrompt.CryptoObject,
-        wrappedKeyPayload: ByteArray
-    ): ByteArray {
-        val cipher = cryptoObject.cipher ?: throw IllegalStateException("Cipher is null in CryptoObject")
 
         val ciphertextOffset = GCM_IV_LENGTH_BYTES
         val ciphertextSize = wrappedKeyPayload.size - GCM_IV_LENGTH_BYTES
