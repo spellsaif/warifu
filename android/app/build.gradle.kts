@@ -6,6 +6,7 @@ plugins {
 android {
     namespace = "org.warifu"
     compileSdk = 34
+    ndkVersion = "27.1.12297006"
 
     defaultConfig {
         applicationId = "org.warifu"
