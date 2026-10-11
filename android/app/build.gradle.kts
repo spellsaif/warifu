@@ -78,10 +78,8 @@ dependencies {
     // 3. Hardware Biometric Authentication
     implementation("androidx.biometric:biometric:1.2.0-alpha05")
 
-    // 4. CameraX & Zero-Cloud QR Scanning
-    implementation("androidx.camera:camera-camera2:1.3.1")
-    implementation("androidx.camera:camera-lifecycle:1.3.1")
-    implementation("androidx.camera:camera-view:1.3.1")
+    // 4. Zero-Cloud QR Scanning (Industry-Standard Authenticator Scanner)
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     implementation("com.google.zxing:core:3.5.3") // 100% offline QR parsing
 
     // 5. UniFFI Runtime

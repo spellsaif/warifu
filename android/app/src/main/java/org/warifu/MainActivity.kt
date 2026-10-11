@@ -9,10 +9,11 @@ import androidx.compose.runtime.*
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import org.warifu.security.HardwareKeystoreManager
 import org.warifu.security.SecurityHardening
 import org.warifu.ui.screens.LockScreen
-import org.warifu.ui.screens.QrScannerScreen
 import org.warifu.ui.screens.TokenListScreen
 import org.warifu.ui.theme.WarifuTheme
 import org.warifu.ui.viewmodel.AuthViewModel
@@ -32,8 +33,27 @@ class MainActivity : FragmentActivity() {
         File(filesDir, "wrapped_kek.bin")
     }
 
-    private var isScanningQr by mutableStateOf(false)
+    private var isExternalScannerActive by mutableStateOf(false)
     private var showManualInputDialog by mutableStateOf(false)
+
+    private val barcodeLauncher = registerForActivityResult(ScanContract()) { result ->
+        isExternalScannerActive = false
+        if (result.contents != null) {
+            handleIncomingTokenUri(result.contents)
+        }
+    }
+
+    private fun launchQrScanner() {
+        isExternalScannerActive = true
+        val options = ScanOptions().apply {
+            setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+            setPrompt("Point camera at 2FA QR code or Google migration QR")
+            setBeepEnabled(false)
+            setOrientationLocked(false)
+            setBarcodeImageEnabled(false)
+        }
+        barcodeLauncher.launch(options)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,19 +80,6 @@ class MainActivity : FragmentActivity() {
                             onCreateVaultClicked = { initializeFreshVault() }
                         )
                     }
-                    isScanningQr -> {
-                        QrScannerScreen(
-                            onQrCodeDetected = { scannedText ->
-                                isScanningQr = false
-                                handleIncomingTokenUri(scannedText)
-                            },
-                            onCloseClicked = { isScanningQr = false },
-                            onManualInputClicked = {
-                                isScanningQr = false
-                                showManualInputDialog = true
-                            }
-                        )
-                    }
                     else -> {
                         TokenListScreen(
                             state = state,
@@ -82,8 +89,8 @@ class MainActivity : FragmentActivity() {
                             onToggleConceal = { viewModel.toggleConcealCodes() },
                             onCopyCode = { code -> viewModel.copyToken(this@MainActivity, code) },
                             onDeleteToken = { id -> viewModel.deleteToken(id) },
-                            onScanQrClicked = { isScanningQr = true },
-                            onImportGoogleClicked = { isScanningQr = true },
+                            onScanQrClicked = { launchQrScanner() },
+                            onImportGoogleClicked = { launchQrScanner() },
                             onManualAddUri = { inputUri -> handleIncomingTokenUri(inputUri) },
                             onLockClicked = { viewModel.lockVault() }
                         )
@@ -189,7 +196,7 @@ class MainActivity : FragmentActivity() {
         super.onStop()
         // Only sanitize and lock memory when user actually leaves the app,
         // not during camera scans, permission dialogs, or configuration changes
-        if (!isScanningQr && !showManualInputDialog && !isChangingConfigurations) {
+        if (!isExternalScannerActive && !showManualInputDialog && !isChangingConfigurations) {
             viewModel.lockVault()
         }
     }
