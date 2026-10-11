@@ -1,10 +1,7 @@
 package org.warifu
 
-import android.Manifest
-import android.content.pm.PackageManager
 import android.os.Bundle
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
@@ -36,16 +33,7 @@ class MainActivity : FragmentActivity() {
     }
 
     private var isScanningQr by mutableStateOf(false)
-
-    private val requestCameraPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            isScanningQr = true
-        } else {
-            Toast.makeText(this, "Camera permission required to scan QR codes", Toast.LENGTH_SHORT).show()
-        }
-    }
+    private var showManualInputDialog by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -78,18 +66,24 @@ class MainActivity : FragmentActivity() {
                                 isScanningQr = false
                                 handleIncomingTokenUri(scannedText)
                             },
-                            onCloseClicked = { isScanningQr = false }
+                            onCloseClicked = { isScanningQr = false },
+                            onManualInputClicked = {
+                                isScanningQr = false
+                                showManualInputDialog = true
+                            }
                         )
                     }
                     else -> {
                         TokenListScreen(
                             state = state,
+                            showManualInputDialog = showManualInputDialog,
+                            onManualInputDialogChange = { showManualInputDialog = it },
                             onSearchChanged = { viewModel.onSearchQueryChanged(it) },
                             onToggleConceal = { viewModel.toggleConcealCodes() },
                             onCopyCode = { code -> viewModel.copyToken(this@MainActivity, code) },
                             onDeleteToken = { id -> viewModel.deleteToken(id) },
-                            onScanQrClicked = { checkCameraPermissionAndScan() },
-                            onImportGoogleClicked = { checkCameraPermissionAndScan() },
+                            onScanQrClicked = { isScanningQr = true },
+                            onImportGoogleClicked = { isScanningQr = true },
                             onManualAddUri = { inputUri -> handleIncomingTokenUri(inputUri) },
                             onLockClicked = { viewModel.lockVault() }
                         )
@@ -109,14 +103,6 @@ class MainActivity : FragmentActivity() {
             val sanitized = trimmed.replace(" ", "").uppercase()
             val uri = "otpauth://totp/Warifu:Account?secret=$sanitized&issuer=Warifu"
             viewModel.addTokenFromUri(uri)
-        }
-    }
-
-    private fun checkCameraPermissionAndScan() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-            isScanningQr = true
-        } else {
-            requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
@@ -201,7 +187,10 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
-        // Lock and sanitize memory whenever user navigates away or turns off screen
-        viewModel.lockVault()
+        // Only sanitize and lock memory when user actually leaves the app,
+        // not during camera scans, permission dialogs, or configuration changes
+        if (!isScanningQr && !showManualInputDialog && !isChangingConfigurations) {
+            viewModel.lockVault()
+        }
     }
 }
