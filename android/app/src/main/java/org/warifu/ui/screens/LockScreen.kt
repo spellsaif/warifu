@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.warifu.ui.components.WarifuLogo
 
 @Composable
 fun LockScreen(
@@ -30,20 +31,22 @@ fun LockScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.Shield,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(84.dp)
-            )
+            WarifuLogo(size = 96.dp)
 
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
                 text = "Warifu",
-                fontSize = 26.sp,
+                fontSize = 32.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground
+            )
+
+            Text(
+                text = "割符",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
             )
 
             Spacer(modifier = Modifier.height(8.dp))

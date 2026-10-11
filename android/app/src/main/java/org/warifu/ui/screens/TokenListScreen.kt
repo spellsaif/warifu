@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.warifu.ui.components.TokenCard
+import org.warifu.ui.components.WarifuLogo
 import org.warifu.ui.viewmodel.AuthUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -120,12 +121,7 @@ fun TokenListScreen(
                         verticalArrangement = Arrangement.Center,
                         modifier = Modifier.padding(32.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Shield,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                            modifier = Modifier.size(72.dp)
-                        )
+                        WarifuLogo(size = 72.dp)
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = if (state.searchQuery.isEmpty()) "No 2FA Accounts Yet" else "No matching accounts found",

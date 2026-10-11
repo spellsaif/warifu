@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+    <!-- Warifu (割符): The Two Interlocking Halves of Authentication -->
+    <defs>
+        <!-- Gradients for subtle depth while remaining strictly minimalist -->
+        <linearGradient id="leftHalfGrad" x1="60" y1="60" x2="240" y2="440" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#3B82F6"/>
+            <stop offset="100%" stop-color="#1D4ED8"/>
+        </linearGradient>
+        <linearGradient id="rightHalfGrad" x1="272" y1="60" x2="452" y2="440" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#06B6D4"/>
+            <stop offset="100%" stop-color="#0284C7"/>
+        </linearGradient>
+    </defs>
+
+    <!-- LEFT HALF OF THE TALLY (Device / Hardware Enclave) -->
+    <!-- Curved shield outer boundary with interlocking central notch -->
+    <path d="M 238 72 
+             C 140 72, 84 126, 84 246 
+             C 84 344, 160 412, 238 440 
+             L 238 316 
+             C 214 316, 196 298, 196 274 
+             C 196 250, 214 232, 238 232 
+             L 238 72 Z" 
+          fill="url(#leftHalfGrad)" />
+
+    <!-- RIGHT HALF OF THE TALLY (Verifier / Authentication Token) -->
+    <!-- Symmetrical shield half with matching interlocking tooth and negative space -->
+    <path d="M 274 72 
+             C 372 72, 428 126, 428 246 
+             C 428 344, 352 412, 274 440 
+             L 274 292 
+             C 298 292, 316 274, 316 250 
+             C 316 226, 298 208, 274 208 
+             L 274 72 Z" 
+          fill="url(#rightHalfGrad)" />
+
+    <!-- CENTRAL AUTHENTICATION SPARK / KEY CORE (Positive Proof) -->
+    <circle cx="256" cy="262" r="14" fill="#FFFFFF" opacity="0.95" />
+</svg>

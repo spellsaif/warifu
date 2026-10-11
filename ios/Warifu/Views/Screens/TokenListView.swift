@@ -9,9 +9,7 @@ struct TokenListView: View {
             Group {
                 if viewModel.filteredTokens.isEmpty {
                     VStack(spacing: 16) {
-                        Image(systemName: "shield.slash")
-                            .font(.system(size: 64))
-                            .foregroundStyle(.secondary.opacity(0.5))
+                        WarifuLogoView(size: 72)
 
                         Text(viewModel.searchQuery.isEmpty ? "No 2FA Accounts Yet" : "No Matching Accounts")
                             .font(.headline)

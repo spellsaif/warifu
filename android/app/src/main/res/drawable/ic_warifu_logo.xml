@@ -1,0 +1,45 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+
+    <!-- Left Tally Half (Hardware Key) -->
+    <path
+        android:pathData="M 238,72 C 140,72 84,126 84,246 C 84,344 160,412 238,440 L 238,316 C 214,316 196,298 196,274 C 196,250 214,232 238,232 L 238,72 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="60"
+                android:startY="60"
+                android:endX="240"
+                android:endY="440"
+                android:type="linear">
+                <item android:color="#3B82F6" android:offset="0.0"/>
+                <item android:color="#1D4ED8" android:offset="1.0"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Right Tally Half (Verifier Token) -->
+    <path
+        android:pathData="M 274,72 C 372,72 428,126 428,246 C 428,344 352,412 274,440 L 274,292 C 298,292 316,274 316,250 C 316,226 298,208 274,208 L 274,72 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="272"
+                android:startY="60"
+                android:endX="452"
+                android:endY="440"
+                android:type="linear">
+                <item android:color="#06B6D4" android:offset="0.0"/>
+                <item android:color="#0284C7" android:offset="1.0"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Center Spark -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.95"
+        android:pathData="M 256,248 A 14,14 0 1,0 256,276 A 14,14 0 1,0 256,248 Z"/>
+</vector>

@@ -13,18 +13,20 @@ struct LockView: View {
             VStack(spacing: 24) {
                 Spacer()
 
-                Image(systemName: "lock.shield.fill")
-                    .font(.system(size: 80))
-                    .foregroundStyle(.tint)
+                WarifuLogoView(size: 96)
 
-                VStack(spacing: 8) {
+                VStack(spacing: 6) {
                     Text("Warifu")
-                        .font(.title)
-                        .fontWeight(.bold)
+                        .font(.system(size: 32, weight: .bold))
+
+                    Text("割符")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(.tint.opacity(0.85))
 
                     Text("Hardware-Secured Multi-Factor Authentication")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                        .padding(.top, 4)
                 }
 
                 Spacer()
