@@ -3,6 +3,10 @@ name = "openauth-core"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "openauth_core"
+crate-type = ["staticlib", "cdylib", "lib"]
+
 [dependencies]
 ring = "0.17"
 data-encoding = "2.6"
@@ -17,3 +21,4 @@ argon2 = { version = "0.5", features = ["alloc", "rand"] }
 libc = "0.2"
 getrandom = "0.2"
 uuid = { version = "1.8", features = ["v4"] }
+uniffi = { version = "0.28", features = ["cli"] }

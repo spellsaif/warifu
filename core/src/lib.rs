@@ -14,6 +14,7 @@
 pub mod algorithm;
 pub mod base32;
 pub mod crypto;
+pub mod ffi;
 pub mod google_migration;
 pub mod hotp;
 pub mod memory;
@@ -22,6 +23,8 @@ pub mod storage;
 pub mod totp;
 pub mod uri;
 pub mod vault;
+
+uniffi::setup_scaffolding!();
 
 pub use algorithm::{Algorithm, Digits, SecretKey};
 pub use crypto::{
