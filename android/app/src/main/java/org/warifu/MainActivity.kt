@@ -1,14 +1,22 @@
 package org.warifu
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import android.widget.Toast
+import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.text.font.FontWeight
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
-import androidx.activity.compose.setContent
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import org.warifu.security.HardwareKeystoreManager
@@ -34,7 +42,9 @@ class MainActivity : FragmentActivity() {
     }
 
     private var isExternalScannerActive by mutableStateOf(false)
+    private var isRequestingPermission by mutableStateOf(false)
     private var showManualInputDialog by mutableStateOf(false)
+    private var showPermissionDeniedDialog by mutableStateOf(false)
 
     private val barcodeLauncher = registerForActivityResult(ScanContract()) { result ->
         isExternalScannerActive = false
@@ -43,16 +53,45 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    private fun launchQrScanner() {
-        isExternalScannerActive = true
-        val options = ScanOptions().apply {
-            setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-            setPrompt("Point camera at 2FA QR code or Google migration QR")
-            setBeepEnabled(false)
-            setOrientationLocked(false)
-            setBarcodeImageEnabled(false)
+    private val requestCameraPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        isRequestingPermission = false
+        if (isGranted) {
+            startScanInternal()
+        } else {
+            showPermissionDeniedDialog = true
         }
-        barcodeLauncher.launch(options)
+    }
+
+    private fun launchQrScanner() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            startScanInternal()
+        } else {
+            isRequestingPermission = true
+            requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    private fun startScanInternal() {
+        try {
+            isExternalScannerActive = true
+            val options = ScanOptions().apply {
+                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                setPrompt("Point camera at 2FA QR code or Google migration QR")
+                setBeepEnabled(false)
+                setOrientationLocked(false)
+                setBarcodeImageEnabled(false)
+            }
+            barcodeLauncher.launch(options)
+        } catch (e: Exception) {
+            isExternalScannerActive = false
+            Toast.makeText(
+                this,
+                "Scanner error: ${e.localizedMessage ?: e.javaClass.simpleName}",
+                Toast.LENGTH_LONG
+            ).show()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,6 +109,44 @@ class MainActivity : FragmentActivity() {
                         Toast.makeText(this@MainActivity, it, Toast.LENGTH_SHORT).show()
                         viewModel.clearStatusMessage()
                     }
+                }
+
+                if (showPermissionDeniedDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showPermissionDeniedDialog = false },
+                        title = { Text("Camera Permission Required", fontWeight = FontWeight.Bold) },
+                        text = {
+                            Text(
+                                "Warifu needs camera permission to scan QR codes offline. " +
+                                "You can grant permission in App Settings, or enter your 2FA key manually."
+                            )
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    showPermissionDeniedDialog = false
+                                    try {
+                                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                            data = Uri.fromParts("package", packageName, null)
+                                        }
+                                        startActivity(intent)
+                                    } catch (_: Exception) {}
+                                }
+                            ) {
+                                Text("Open Settings")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = {
+                                    showPermissionDeniedDialog = false
+                                    showManualInputDialog = true
+                                }
+                            ) {
+                                Text("Enter Key Manually")
+                            }
+                        }
+                    )
                 }
 
                 when {
@@ -196,7 +273,7 @@ class MainActivity : FragmentActivity() {
         super.onStop()
         // Only sanitize and lock memory when user actually leaves the app,
         // not during camera scans, permission dialogs, or configuration changes
-        if (!isExternalScannerActive && !showManualInputDialog && !isChangingConfigurations) {
+        if (!isRequestingPermission && !isExternalScannerActive && !showManualInputDialog && !isChangingConfigurations) {
             viewModel.lockVault()
         }
     }
