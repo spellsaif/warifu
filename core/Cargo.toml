@@ -1,0 +1,11 @@
+[package]
+name = "openauth-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ring = "0.17"
+data-encoding = "2.6"
+zeroize = { version = "1.8", features = ["derive"] }
+subtle = "2.6"
+thiserror = "1.0"
