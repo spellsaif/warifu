@@ -12,7 +12,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 #[derive(Error, Debug, uniffi::Error)]
-pub enum OpenAuthError {
+pub enum WarifuError {
     #[error("Cryptographic error: {message}")]
     CryptoError { message: String },
     #[error("Storage error: {message}")]
@@ -51,27 +51,27 @@ pub struct VaultSession {
 impl VaultSession {
     /// Unlocks an existing encrypted vault using a 32-byte hardware-unwrapped Vault Key.
     #[uniffi::constructor]
-    pub fn open(vault_path: String, vault_key_bytes: Vec<u8>) -> Result<Arc<Self>, OpenAuthError> {
+    pub fn open(vault_path: String, vault_key_bytes: Vec<u8>) -> Result<Arc<Self>, WarifuError> {
         let path = PathBuf::from(vault_path);
         if !path.exists() {
-            return Err(OpenAuthError::StorageError {
+            return Err(WarifuError::StorageError {
                 message: format!("Vault file does not exist at {:?}", path),
             });
         }
 
         let locked_key = LockedBytes::new(vault_key_bytes);
-        let envelope = load_envelope(&path).map_err(|e| OpenAuthError::StorageError {
+        let envelope = load_envelope(&path).map_err(|e| WarifuError::StorageError {
             message: e.to_string(),
         })?;
 
         let decrypted_bytes = decrypt_envelope(&envelope, &locked_key).map_err(|e| {
-            OpenAuthError::CryptoError {
+            WarifuError::CryptoError {
                 message: e.to_string(),
             }
         })?;
 
         let database = VaultDatabase::deserialize(decrypted_bytes.as_slice()).map_err(|e| {
-            OpenAuthError::VaultError {
+            WarifuError::VaultError {
                 message: e.to_string(),
             }
         })?;
@@ -85,22 +85,22 @@ impl VaultSession {
 
     /// Creates and initializes a fresh, empty encrypted vault on disk.
     #[uniffi::constructor]
-    pub fn create_new(vault_path: String, vault_key_bytes: Vec<u8>) -> Result<Arc<Self>, OpenAuthError> {
+    pub fn create_new(vault_path: String, vault_key_bytes: Vec<u8>) -> Result<Arc<Self>, WarifuError> {
         let path = PathBuf::from(vault_path);
         let locked_key = LockedBytes::new(vault_key_bytes);
         let database = VaultDatabase::new();
 
-        let serialized = database.serialize().map_err(|e| OpenAuthError::VaultError {
+        let serialized = database.serialize().map_err(|e| WarifuError::VaultError {
             message: e.to_string(),
         })?;
 
         let envelope = encrypt_envelope(&serialized, &locked_key, None).map_err(|e| {
-            OpenAuthError::CryptoError {
+            WarifuError::CryptoError {
                 message: e.to_string(),
             }
         })?;
 
-        save_envelope_atomic(&path, &envelope).map_err(|e| OpenAuthError::StorageError {
+        save_envelope_atomic(&path, &envelope).map_err(|e| WarifuError::StorageError {
             message: e.to_string(),
         })?;
 
@@ -112,9 +112,9 @@ impl VaultSession {
     }
 
     /// Evaluates and returns all active OTP tokens with current codes and monotonic timers.
-    pub fn list_tokens(&self, current_unix_time: u64) -> Result<Vec<TokenView>, OpenAuthError> {
+    pub fn list_tokens(&self, current_unix_time: u64) -> Result<Vec<TokenView>, WarifuError> {
         let db_guard = self.database.lock().unwrap();
-        let db = db_guard.as_ref().ok_or(OpenAuthError::VaultLocked)?;
+        let db = db_guard.as_ref().ok_or(WarifuError::VaultLocked)?;
 
         let mut views = Vec::with_capacity(db.tokens.len());
 
@@ -168,8 +168,8 @@ impl VaultSession {
     }
 
     /// Parses and imports a single `otpauth://` URI scanned from a QR code.
-    pub fn add_token_from_uri(&self, uri: String) -> Result<String, OpenAuthError> {
-        let parsed = parse_otpauth_uri(&uri).map_err(|e| OpenAuthError::ParseError {
+    pub fn add_token_from_uri(&self, uri: String) -> Result<String, WarifuError> {
+        let parsed = parse_otpauth_uri(&uri).map_err(|e| WarifuError::ParseError {
             message: e.to_string(),
         })?;
 
@@ -211,7 +211,7 @@ impl VaultSession {
 
         {
             let mut db_guard = self.database.lock().unwrap();
-            let db = db_guard.as_mut().ok_or(OpenAuthError::VaultLocked)?;
+            let db = db_guard.as_mut().ok_or(WarifuError::VaultLocked)?;
             db.add_token(entry);
         }
 
@@ -220,9 +220,9 @@ impl VaultSession {
     }
 
     /// Imports multiple accounts in bulk from a Google Authenticator migration QR code.
-    pub fn import_google_migration(&self, migration_uri: String) -> Result<u32, OpenAuthError> {
+    pub fn import_google_migration(&self, migration_uri: String) -> Result<u32, WarifuError> {
         let parsed_tokens = parse_google_migration_uri(&migration_uri).map_err(|e| {
-            OpenAuthError::ParseError {
+            WarifuError::ParseError {
                 message: e.to_string(),
             }
         })?;
@@ -235,7 +235,7 @@ impl VaultSession {
 
         {
             let mut db_guard = self.database.lock().unwrap();
-            let db = db_guard.as_mut().ok_or(OpenAuthError::VaultLocked)?;
+            let db = db_guard.as_mut().ok_or(WarifuError::VaultLocked)?;
 
             for parsed in parsed_tokens {
                 let token_type_id = match parsed.token_type {
@@ -275,9 +275,9 @@ impl VaultSession {
     }
 
     /// Exports all active tokens back into a Google Authenticator migration URI format.
-    pub fn export_google_migration(&self) -> Result<String, OpenAuthError> {
+    pub fn export_google_migration(&self) -> Result<String, WarifuError> {
         let db_guard = self.database.lock().unwrap();
-        let db = db_guard.as_ref().ok_or(OpenAuthError::VaultLocked)?;
+        let db = db_guard.as_ref().ok_or(WarifuError::VaultLocked)?;
 
         let mut parsed_tokens = Vec::with_capacity(db.tokens.len());
         for t in &db.tokens {
@@ -309,11 +309,11 @@ impl VaultSession {
     }
 
     /// Deletes a token and records a deletion tombstone for conflict-free multi-device sync.
-    pub fn remove_token(&self, id: String) -> Result<(), OpenAuthError> {
+    pub fn remove_token(&self, id: String) -> Result<(), WarifuError> {
         {
             let mut db_guard = self.database.lock().unwrap();
-            let db = db_guard.as_mut().ok_or(OpenAuthError::VaultLocked)?;
-            db.remove_token(&id).map_err(|e| OpenAuthError::VaultError {
+            let db = db_guard.as_mut().ok_or(WarifuError::VaultLocked)?;
+            db.remove_token(&id).map_err(|e| WarifuError::VaultError {
                 message: e.to_string(),
             })?;
         }
@@ -323,25 +323,25 @@ impl VaultSession {
     }
 
     /// Persists changes to disk atomically using envelope encryption.
-    pub fn save(&self) -> Result<(), OpenAuthError> {
+    pub fn save(&self) -> Result<(), WarifuError> {
         let db_guard = self.database.lock().unwrap();
-        let db = db_guard.as_ref().ok_or(OpenAuthError::VaultLocked)?;
+        let db = db_guard.as_ref().ok_or(WarifuError::VaultLocked)?;
 
         let key_guard = self.vault_key.lock().unwrap();
-        let key = key_guard.as_ref().ok_or(OpenAuthError::VaultLocked)?;
+        let key = key_guard.as_ref().ok_or(WarifuError::VaultLocked)?;
 
-        let serialized = db.serialize().map_err(|e| OpenAuthError::VaultError {
+        let serialized = db.serialize().map_err(|e| WarifuError::VaultError {
             message: e.to_string(),
         })?;
 
         let envelope = encrypt_envelope(&serialized, key, None).map_err(|e| {
-            OpenAuthError::CryptoError {
+            WarifuError::CryptoError {
                 message: e.to_string(),
             }
         })?;
 
         save_envelope_atomic(&self.vault_path, &envelope).map_err(|e| {
-            OpenAuthError::StorageError {
+            WarifuError::StorageError {
                 message: e.to_string(),
             }
         })?;
@@ -363,8 +363,8 @@ impl VaultSession {
 
 /// Generates a fresh 256-bit cryptographically secure Vault Key to be wrapped by Android StrongBox or Apple Secure Enclave.
 #[uniffi::export]
-pub fn ffi_generate_vault_key() -> Result<Vec<u8>, OpenAuthError> {
-    let key = generate_vault_key().map_err(|e| OpenAuthError::CryptoError {
+pub fn ffi_generate_vault_key() -> Result<Vec<u8>, WarifuError> {
+    let key = generate_vault_key().map_err(|e| WarifuError::CryptoError {
         message: e.to_string(),
     })?;
     Ok(key.as_slice().to_vec())
@@ -372,8 +372,8 @@ pub fn ffi_generate_vault_key() -> Result<Vec<u8>, OpenAuthError> {
 
 /// Generates a 32-byte CSPRNG salt for passphrase key derivation.
 #[uniffi::export]
-pub fn ffi_generate_salt() -> Result<Vec<u8>, OpenAuthError> {
-    let salt = generate_salt().map_err(|e| OpenAuthError::CryptoError {
+pub fn ffi_generate_salt() -> Result<Vec<u8>, WarifuError> {
+    let salt = generate_salt().map_err(|e| WarifuError::CryptoError {
         message: e.to_string(),
     })?;
     Ok(salt.to_vec())
@@ -381,9 +381,9 @@ pub fn ffi_generate_salt() -> Result<Vec<u8>, OpenAuthError> {
 
 /// Derives a 256-bit key from a user passphrase and salt via Argon2id (RFC 9106).
 #[uniffi::export]
-pub fn ffi_derive_key_argon2id(password: String, salt: Vec<u8>) -> Result<Vec<u8>, OpenAuthError> {
+pub fn ffi_derive_key_argon2id(password: String, salt: Vec<u8>) -> Result<Vec<u8>, WarifuError> {
     if salt.len() != 32 {
-        return Err(OpenAuthError::CryptoError {
+        return Err(WarifuError::CryptoError {
             message: "Salt must be precisely 32 bytes".to_string(),
         });
     }
@@ -391,7 +391,7 @@ pub fn ffi_derive_key_argon2id(password: String, salt: Vec<u8>) -> Result<Vec<u8
     let mut salt_arr = [0u8; 32];
     salt_arr.copy_from_slice(&salt);
 
-    let key = derive_key_argon2id(&password, &salt_arr).map_err(|e| OpenAuthError::CryptoError {
+    let key = derive_key_argon2id(&password, &salt_arr).map_err(|e| WarifuError::CryptoError {
         message: e.to_string(),
     })?;
 
@@ -469,7 +469,7 @@ mod tests {
         session.lock();
         assert!(matches!(
             session.list_tokens(1000000),
-            Err(OpenAuthError::VaultLocked)
+            Err(WarifuError::VaultLocked)
         ));
 
         // 5. Re-open vault with key

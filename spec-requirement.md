@@ -1,5 +1,5 @@
 # Specification & Requirements Document
-## Project: OpenAuthenticator Technical Specifications
+## Project: Warifu Technical Specifications
 
 ---
 
@@ -78,7 +78,7 @@ The application vault format is serialized using Protocol Buffers version 3.
 ```protobuf
 syntax = "proto3";
 
-package openauth.vault;
+package warifu.vault;
 
 enum Algorithm {
   ALGORITHM_UNSPECIFIED = 0;

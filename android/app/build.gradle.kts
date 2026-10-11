@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "org.openauth"
+    namespace = "org.warifu"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "org.openauth"
+        applicationId = "org.warifu"
         minSdk = 26
         targetSdk = 34
         versionCode = 1

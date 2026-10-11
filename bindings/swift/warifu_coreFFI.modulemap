@@ -1,0 +1,4 @@
+module warifu_coreFFI {
+    header "warifu_coreFFI.h"
+    export *
+}

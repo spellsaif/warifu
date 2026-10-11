@@ -2,20 +2,20 @@
 import PackageDescription
 
 let package = Package(
-    name: "OpenAuthenticator",
+    name: "Warifu",
     platforms: [
         .iOS(.v17)
     ],
     products: [
         .library(
-            name: "OpenAuthenticator",
-            targets: ["OpenAuthenticator"]
+            name: "Warifu",
+            targets: ["Warifu"]
         )
     ],
     targets: [
         .target(
-            name: "OpenAuthenticator",
-            path: "OpenAuthenticator",
+            name: "Warifu",
+            path: "Warifu",
             exclude: [
                 "App/Info.plist"
             ],

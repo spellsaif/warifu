@@ -40,7 +40,7 @@ enum SecureEnclaveError: LocalizedError {
 /// - Device bound: Protected with `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, preventing inclusion in unencrypted iTunes/iCloud backups.
 final class SecureEnclaveManager {
 
-    private static let keyTag = "org.openauth.secure_enclave.kek.v1"
+    private static let keyTag = "org.warifu.secure_enclave.kek.v1"
 
     /// Checks if the hardware Key Encryption Key exists in the iOS Keychain.
     func hasMasterKey() -> Bool {
@@ -138,7 +138,7 @@ final class SecureEnclaveManager {
     func unwrapVaultKey(
         wrappedKey: Data,
         context: LAContext,
-        promptReason: String = "Unlock your OpenAuthenticator Vault"
+        promptReason: String = "Unlock your Warifu Vault"
     ) async throws -> Data {
         context.localizedReason = promptReason
 

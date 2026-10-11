@@ -1,5 +1,5 @@
 # Technology Stack, Cryptographic Specifications & Dependency Manifest
-## Project: OpenAuthenticator Technology Architecture
+## Project: Warifu Technology Architecture
 
 ---
 
@@ -39,15 +39,15 @@ All dependencies are locked, audited for supply-chain vulnerabilities, and selec
 
 ```toml
 [package]
-name = "openauthenticator-core"
+name = "warifu-core"
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-authors = ["OpenAuthenticator Contributors"]
+authors = ["Warifu Contributors"]
 
 [lib]
 crate-type = ["staticlib", "cdylib", "lib"]
-name = "openauthenticator_core"
+name = "warifu_core"
 
 [dependencies]
 # 1. Cryptographic Primitives & HMAC
@@ -105,7 +105,7 @@ proptest = "1.4"                # Property-based fuzz testing
 #### 4.2 StrongBox vs. TEE Performance Profile (Android)
 * **TEE (Trusted Execution Environment)**: Runs on the application processor via ARM TrustZone. Fast (~$1.5\,\text{ms}$ per crypto op), protected against OS kernel compromise.
 * **StrongBox Keymaster**: Runs on dedicated physical silicon with its own isolated RAM/CPU (e.g., Titan M2 on Google Pixel, NXP SE). Tamper-resistant, physical-probe resistant. Slower (~$25\,\text{ms} - 45\,\text{ms}$ per crypto op).
-* **Architectural Decision**: OpenAuthenticator uses StrongBox to unwrap the **Vault Key (VK)** *once* upon application unlock, holding the decrypted VK in locked RAM (`mlock`). This provides maximum physical tamper resistance with zero impact on UI scrolling or code generation speed.
+* **Architectural Decision**: Warifu uses StrongBox to unwrap the **Vault Key (VK)** *once* upon application unlock, holding the decrypted VK in locked RAM (`mlock`). This provides maximum physical tamper resistance with zero impact on UI scrolling or code generation speed.
 
 ---
 
@@ -120,7 +120,7 @@ proptest = "1.4"                # Property-based fuzz testing
   ```
 * UniFFI Binding Generation:
   ```bash
-  cargo run --bin uniffi-bindgen generate src/openauth.udl --language kotlin --out-dir ../android/app/src/main/java/org/openauth/core
+  cargo run --bin uniffi-bindgen generate src/warifu.udl --language kotlin --out-dir ../android/app/src/main/java/org/warifu/core
   ```
 
 #### 5.2 iOS Compilation Toolchain

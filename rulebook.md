@@ -1,5 +1,5 @@
 # Engineering, Security & Contribution Rulebook
-## Project: OpenAuthenticator Development Standard
+## Project: Warifu Development Standard
 
 ---
 

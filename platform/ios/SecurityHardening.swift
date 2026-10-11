@@ -40,7 +40,7 @@ struct PrivacyShieldModifier: ViewModifier {
                                 .font(.system(size: 48))
                                 .foregroundStyle(.secondary)
 
-                            Text("OpenAuthenticator")
+                            Text("Warifu")
                                 .font(.headline)
                                 .foregroundStyle(.secondary)
                         }

@@ -1,4 +1,4 @@
-package org.openauth.platform.android.security
+package org.warifu.platform.android.security
 
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
@@ -23,7 +23,7 @@ class HardwareKeystoreManager {
 
     companion object {
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
-        private const val MASTER_KEK_ALIAS = "openauth_master_kek_v1"
+        private const val MASTER_KEK_ALIAS = "warifu_master_kek_v1"
         private const val GCM_IV_LENGTH_BYTES = 12
         private const val GCM_TAG_LENGTH_BITS = 128
         private const val TRANSFORMATION = "AES/GCM/NoPadding"

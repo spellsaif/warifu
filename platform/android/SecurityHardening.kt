@@ -1,4 +1,4 @@
-package org.openauth.platform.android.security
+package org.warifu.platform.android.security
 
 import android.app.Activity
 import android.content.ClipData

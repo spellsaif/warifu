@@ -1,10 +1,12 @@
 [package]
-name = "openauth-core"
+name = "warifu-core"
 version = "0.1.0"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "High-performance, memory-safe cryptographic core for Warifu 2FA"
 
 [lib]
-name = "openauth_core"
+name = "warifu_core"
 crate-type = ["staticlib", "cdylib", "lib"]
 
 [dependencies]

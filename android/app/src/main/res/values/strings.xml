@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">OpenAuthenticator</string>
+    <string name="app_name">Warifu</string>
     <string name="unlock_vault">Unlock Vault</string>
     <string name="unlock_prompt">Authenticate using fingerprint or face to decrypt your tokens</string>
     <string name="search_tokens">Search accounts or tags…</string>

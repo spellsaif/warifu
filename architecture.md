@@ -1,11 +1,11 @@
 # System Architecture Document
-## Project: OpenAuthenticator Core Architecture
+## Project: Warifu Core Architecture
 
 ---
 
 ### 1. High-Level System Topology
 
-OpenAuthenticator adopts a **Headless Security Core** architecture. The cryptographic, serialization, state management, and memory sanitization logic is strictly isolated in an audited, cross-platform **Rust Core**. The mobile presentation layers (Android and iOS) are thin, declarative UI shells communicating with the core via Mozilla `uniffi-rs` (C-ABI).
+Warifu adopts a **Headless Security Core** architecture. The cryptographic, serialization, state management, and memory sanitization logic is strictly isolated in an audited, cross-platform **Rust Core**. The mobile presentation layers (Android and iOS) are thin, declarative UI shells communicating with the core via Mozilla `uniffi-rs` (C-ABI).
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -52,7 +52,7 @@ OpenAuthenticator adopts a **Headless Security Core** architecture. The cryptogr
 
 ### 2. Cryptographic Key Hierarchy
 
-A critical design flaw in naive authenticators is holding the database master key unencrypted in RAM or decoupling biometric authentication from the cryptographic unwrap. OpenAuthenticator enforces a strict multi-tier key hierarchy:
+A critical design flaw in naive authenticators is holding the database master key unencrypted in RAM or decoupling biometric authentication from the cryptographic unwrap. Warifu enforces a strict multi-tier key hierarchy:
 
 ```
 [User Master Password] (Optional, for manual passkey mode)
@@ -97,7 +97,7 @@ biometricPrompt.authenticate(..., onAuthenticationSucceeded = {
 })
 ```
 
-#### OpenAuthenticator Secure Implementation:
+#### Warifu Secure Implementation:
 The presentation layer creates a `Cipher` or receives a hardware challenge from the OS Keystore. Decryption of the Vault Key **cannot occur** without the hardware token:
 
 ```mermaid
@@ -155,7 +155,7 @@ At the machine code level, memory scrubbing executes explicit memory barriers (`
 
 ### 5. Storage Architecture: Single-File Atomic Envelope vs. SQLite
 
-| Architectural Dimension | SQLite / SQLCipher | OpenAuthenticator Atomic Envelope |
+| Architectural Dimension | SQLite / SQLCipher | Warifu Atomic Envelope |
 | :--- | :--- | :--- |
 | **Typical Token Storage Size** | 100 tokens $\approx$ 150 KB – 500 KB (B-tree overhead) | 100 tokens $\approx$ 8 KB – 25 KB (Protocol Buffer) |
 | **Memory Sanitization** | Plaintext pages cached across SQLite pager cache | Single decrypted buffer in pinned RAM, zeroized at drop |
@@ -173,7 +173,7 @@ At the machine code level, memory scrubbing executes explicit memory barriers (`
 
 ### 6. Distributed E2EE Sync Architecture (CRDT)
 
-To enable multi-device sync without compromising privacy or suffering from race conditions, OpenAuthenticator uses a state-based **Last-Write-Wins Element-Set (LWW-Element-Set) Conflict-Free Replicated Data Type**:
+To enable multi-device sync without compromising privacy or suffering from race conditions, Warifu uses a state-based **Last-Write-Wins Element-Set (LWW-Element-Set) Conflict-Free Replicated Data Type**:
 
 ```
       Device A (Add Token X)                       Device B (Edit Token Y)

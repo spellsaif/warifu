@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "OpenAuthenticator"
+rootProject.name = "Warifu"
 include(":app")

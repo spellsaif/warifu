@@ -1,8 +1,8 @@
-use openauth_core::algorithm::{Algorithm, Digits, SecretKey};
-use openauth_core::google_migration::{encode_google_migration_uri, parse_google_migration_uri};
-use openauth_core::totp::{generate_totp, verify_totp};
-use openauth_core::uri::{parse_otpauth_uri, ParsedToken, TokenType};
-use openauth_core::vault::VaultDatabase;
+use warifu_core::algorithm::{Algorithm, Digits, SecretKey};
+use warifu_core::google_migration::{encode_google_migration_uri, parse_google_migration_uri};
+use warifu_core::totp::{generate_totp, verify_totp};
+use warifu_core::uri::{parse_otpauth_uri, ParsedToken, TokenType};
+use warifu_core::vault::VaultDatabase;
 use proptest::prelude::*;
 
 proptest! {

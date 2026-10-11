@@ -1,11 +1,11 @@
 # Feature Matrix & Functional Breakdown
-## Project: OpenAuthenticator Capabilities
+## Project: Warifu Capabilities
 
 ---
 
 ### 1. Competitive Architecture & Feature Comparison
 
-| Feature / Dimension | Google Authenticator | Aegis Authenticator | 2FAS | Ente Auth | **OpenAuthenticator (This Project)** |
+| Feature / Dimension | Google Authenticator | Aegis Authenticator | 2FAS | Ente Auth | **Warifu (This Project)** |
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | **Open Source License** | ❌ Proprietary (since v2.x) | ✅ GPL-3.0 | ✅ GPL-3.0 | ✅ GPL-3.0 | ✅ **MIT / Apache-2.0 Dual** |
 | **Cross-Platform Support** | iOS & Android | ❌ Android only | iOS & Android | iOS, Android, Desktop | ✅ **iOS & Android (Unified Rust Core)** |
@@ -66,7 +66,7 @@
   * Direct scanning and decoding of `otpauth-migration://offline?data=...` QR codes.
   * Ability to export tokens back into Google Authenticator QR format for users needing reverse compatibility.
 * **Encrypted Vault Export**:
-  * Complete export to a single `.openauth` encrypted file (Argon2id + XChaCha20-Poly1305).
+  * Complete export to a single `.warifu` encrypted file (Argon2id + XChaCha20-Poly1305).
 * **Interoperability Importers**:
   * Aegis Encrypted JSON.
   * 2FAS Backup JSON.

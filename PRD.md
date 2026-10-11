@@ -1,10 +1,10 @@
 # Product Requirements Document (PRD)
-## Project: AegisCore / OpenAuthenticator (Next-Generation Open Source 2FA)
+## Project: AegisCore / Warifu (Next-Generation Open Source 2FA)
 
 ---
 
 ### 1. Executive Summary & Vision
-**Product Name (Working Title):** `OpenAuthenticator`  
+**Product Name (Working Title):** `Warifu`  
 **Mission:** Provide an open-source, mathematically verifiable, zero-knowledge, and offline-first multi-factor authenticator for Android and iOS that matches the instantaneous UX of Google Authenticator while eliminating its critical privacy and security shortcomings.
 
 #### Core Value Propositions:
