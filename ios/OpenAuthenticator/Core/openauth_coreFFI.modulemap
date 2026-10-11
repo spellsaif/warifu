@@ -1,0 +1,4 @@
+module openauth_coreFFI {
+    header "openauth_coreFFI.h"
+    export *
+}
