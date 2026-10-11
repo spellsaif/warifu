@@ -1703,45 +1703,25 @@ public object FfiConverterTypeTokenView: FfiConverterRustBuffer<TokenView> {
 
 
 
-sealed class WarifuException: kotlin.Exception() {
+sealed class WarifuException(message: kotlin.String? = null): kotlin.Exception(message) {
     
     class CryptoException(
-        
-        val `message`: kotlin.String
-        ) : WarifuException() {
-        override val message
-            get() = "message=${ `message` }"
-    }
+        override val message: kotlin.String
+    ) : WarifuException(message)
     
     class StorageException(
-        
-        val `message`: kotlin.String
-        ) : WarifuException() {
-        override val message
-            get() = "message=${ `message` }"
-    }
+        override val message: kotlin.String
+    ) : WarifuException(message)
     
     class ParseException(
-        
-        val `message`: kotlin.String
-        ) : WarifuException() {
-        override val message
-            get() = "message=${ `message` }"
-    }
+        override val message: kotlin.String
+    ) : WarifuException(message)
     
     class VaultException(
-        
-        val `message`: kotlin.String
-        ) : WarifuException() {
-        override val message
-            get() = "message=${ `message` }"
-    }
+        override val message: kotlin.String
+    ) : WarifuException(message)
     
-    class VaultLocked(
-        ) : WarifuException() {
-        override val message
-            get() = ""
-    }
+    class VaultLocked : WarifuException("Vault is locked")
     
 
     companion object ErrorHandler : UniffiRustCallStatusErrorHandler<WarifuException> {
