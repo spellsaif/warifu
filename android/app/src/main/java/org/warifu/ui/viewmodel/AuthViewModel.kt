@@ -64,7 +64,9 @@ class AuthViewModel : ViewModel() {
 
     fun lockVault() {
         tickerJob?.cancel()
-        session?.lock()
+        try {
+            session?.lock()
+        } catch (_: Exception) {}
         session = null
         _uiState.update {
             it.copy(
@@ -116,7 +118,10 @@ class AuthViewModel : ViewModel() {
     }
 
     fun addTokenFromUri(uri: String): Boolean {
-        val currentSession = session ?: return false
+        val currentSession = session ?: run {
+            _uiState.update { it.copy(statusMessage = "Vault is locked. Unlock before adding accounts.") }
+            return false
+        }
         return try {
             currentSession.addTokenFromUri(uri)
             refreshTokens()
@@ -130,7 +135,10 @@ class AuthViewModel : ViewModel() {
     }
 
     fun importGoogleMigration(migrationUri: String): Int {
-        val currentSession = session ?: return 0
+        val currentSession = session ?: run {
+            _uiState.update { it.copy(statusMessage = "Vault is locked. Unlock before importing accounts.") }
+            return 0
+        }
         return try {
             val count = currentSession.importGoogleMigration(migrationUri).toInt()
             refreshTokens()
@@ -155,7 +163,10 @@ class AuthViewModel : ViewModel() {
     }
 
     fun deleteToken(id: String) {
-        val currentSession = session ?: return
+        val currentSession = session ?: run {
+            _uiState.update { it.copy(statusMessage = "Vault is locked. Unlock before deleting accounts.") }
+            return
+        }
         try {
             currentSession.removeToken(id)
             refreshTokens()
