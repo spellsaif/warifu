@@ -6,87 +6,95 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-private val DarkColorScheme = darkColorScheme(
-    primary = PrimaryBlue,
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFF1E3A8A),
-    onPrimaryContainer = Color(0xFFDBEAFE),
-    secondary = AccentCyan,
-    onSecondary = Color.Black,
-    secondaryContainer = Color(0xFF164E63),
-    onSecondaryContainer = Color(0xFFCFFAFE),
-    tertiary = AccentPurple,
-    background = DarkBackground,
-    surface = DarkSurface,
-    surfaceVariant = DarkSurfaceVariant,
-    onBackground = DarkTextPrimary,
-    onSurface = DarkTextPrimary,
-    onSurfaceVariant = DarkTextSecondary,
-    outline = DarkCardBorder,
-    error = TimerRed
+private val MonochromaticDarkColorScheme = darkColorScheme(
+    primary = MonoDarkAction,
+    onPrimary = MonoDarkActionText,
+    primaryContainer = MonoDarkSurfaceElevated,
+    onPrimaryContainer = MonoDarkTextPrimary,
+    secondary = MonoDarkTextSecondary,
+    onSecondary = MonoDarkBackground,
+    secondaryContainer = MonoDarkSurface,
+    onSecondaryContainer = MonoDarkTextSecondary,
+    tertiary = MonoDarkTextMuted,
+    background = MonoDarkBackground,
+    surface = MonoDarkSurfaceElevated,
+    surfaceVariant = MonoDarkSurface,
+    onBackground = MonoDarkTextPrimary,
+    onSurface = MonoDarkTextPrimary,
+    onSurfaceVariant = MonoDarkTextSecondary,
+    outline = MonoDarkBorder,
+    outlineVariant = MonoDarkBorderSubtle,
+    error = StatusCritical
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = PrimaryDark,
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFDBEAFE),
-    onPrimaryContainer = Color(0xFF1E3A8A),
-    secondary = AccentCyan,
-    onSecondary = Color.White,
-    secondaryContainer = Color(0xFFCFFAFE),
-    onSecondaryContainer = Color(0xFF164E63),
-    tertiary = AccentPurple,
-    background = LightBackground,
-    surface = LightSurface,
-    surfaceVariant = LightSurfaceVariant,
-    onBackground = LightTextPrimary,
-    onSurface = LightTextPrimary,
-    onSurfaceVariant = LightTextSecondary,
-    outline = LightCardBorder,
-    error = TimerRed
+private val MinimalistLightColorScheme = lightColorScheme(
+    primary = MonoLightAction,
+    onPrimary = MonoLightActionText,
+    primaryContainer = MonoLightSurface,
+    onPrimaryContainer = MonoLightTextPrimary,
+    secondary = MonoLightTextSecondary,
+    onSecondary = MonoLightBackground,
+    secondaryContainer = MonoLightSurface,
+    onSecondaryContainer = MonoLightTextSecondary,
+    tertiary = MonoLightTextMuted,
+    background = MonoLightBackground,
+    surface = MonoLightSurfaceElevated,
+    surfaceVariant = MonoLightSurface,
+    onBackground = MonoLightTextPrimary,
+    onSurface = MonoLightTextPrimary,
+    onSurfaceVariant = MonoLightTextSecondary,
+    outline = MonoLightBorder,
+    outlineVariant = MonoLightBorderSubtle,
+    error = StatusCritical
 )
 
 val WarifuTypography = Typography(
     headlineLarge = TextStyle(
         fontWeight = FontWeight.Bold,
-        fontSize = 32.sp,
-        letterSpacing = (-0.5).sp
+        fontSize = 28.sp,
+        letterSpacing = (-0.4).sp,
+        lineHeight = 34.sp
     ),
     headlineMedium = TextStyle(
-        fontWeight = FontWeight.Bold,
-        fontSize = 24.sp,
-        letterSpacing = (-0.3).sp
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 22.sp,
+        letterSpacing = (-0.2).sp,
+        lineHeight = 28.sp
     ),
     titleLarge = TextStyle(
         fontWeight = FontWeight.SemiBold,
-        fontSize = 20.sp,
-        letterSpacing = (-0.2).sp
+        fontSize = 18.sp,
+        letterSpacing = (-0.1).sp,
+        lineHeight = 24.sp
     ),
     titleMedium = TextStyle(
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 16.sp,
-        letterSpacing = 0.sp
+        fontWeight = FontWeight.Medium,
+        fontSize = 15.sp,
+        letterSpacing = 0.sp,
+        lineHeight = 20.sp
     ),
     bodyLarge = TextStyle(
         fontWeight = FontWeight.Normal,
-        fontSize = 15.sp,
-        lineHeight = 22.sp
+        fontSize = 14.sp,
+        letterSpacing = 0.1.sp,
+        lineHeight = 20.sp
     ),
     bodyMedium = TextStyle(
         fontWeight = FontWeight.Normal,
         fontSize = 13.sp,
+        letterSpacing = 0.1.sp,
         lineHeight = 18.sp
     ),
     labelSmall = TextStyle(
         fontWeight = FontWeight.Medium,
         fontSize = 11.sp,
-        letterSpacing = 0.5.sp
+        letterSpacing = 0.4.sp,
+        lineHeight = 16.sp
     )
 )
 
@@ -95,7 +103,7 @@ fun WarifuTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val colorScheme = if (darkTheme) MonochromaticDarkColorScheme else MinimalistLightColorScheme
 
     MaterialTheme(
         colorScheme = colorScheme,

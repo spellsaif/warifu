@@ -2,34 +2,48 @@ package org.warifu.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Primary Brand Palette (Sapphire & Cyan)
-val PrimaryBlue = Color(0xFF3B82F6)
-val PrimaryBlueLight = Color(0xFF60A5FA)
-val PrimaryDark = Color(0xFF1D4ED8)
-val AccentCyan = Color(0xFF06B6D4)
-val AccentPurple = Color(0xFF8B5CF6)
+// ============================================================================
+// Monochromatic Dark Mode (Shades of Pure & Neutral Dark)
+// ============================================================================
+val MonoDarkBackground = Color(0xFF09090B)       // Zinc-950
+val MonoDarkSurface = Color(0xFF131316)          // Refined dark surface
+val MonoDarkSurfaceElevated = Color(0xFF1C1C20)  // Elevated card background
+val MonoDarkBorder = Color(0xFF27272A)           // Hairline subtle stroke (Zinc-800)
+val MonoDarkBorderSubtle = Color(0xFF1E1E22)     // Ultra-soft card divider
+val MonoDarkTextPrimary = Color(0xFFFAFAFA)      // Zinc-50
+val MonoDarkTextSecondary = Color(0xFFA1A1AA)    // Zinc-400
+val MonoDarkTextMuted = Color(0xFF71717A)        // Zinc-500
+val MonoDarkAction = Color(0xFFFFFFFF)           // Pure white high-contrast action
+val MonoDarkActionText = Color(0xFF09090B)       // Dark text on white button
 
-// High-Precision Timer Colors
+// ============================================================================
+// Minimalist Light Mode (Crisp Paper & Neutral Grays)
+// ============================================================================
+val MonoLightBackground = Color(0xFFF9FAFB)      // Clean off-white background
+val MonoLightSurface = Color(0xFFF3F4F6)         // Soft gray surface
+val MonoLightSurfaceElevated = Color(0xFFFFFFFF) // Pure white card
+val MonoLightBorder = Color(0xFFE4E4E7)          // Subtle card border (Zinc-200)
+val MonoLightBorderSubtle = Color(0xFFF4F4F5)    // Divider
+val MonoLightTextPrimary = Color(0xFF09090B)     // Zinc-950
+val MonoLightTextSecondary = Color(0xFF52525B)   // Zinc-600
+val MonoLightTextMuted = Color(0xFFA1A1AA)       // Zinc-400
+val MonoLightAction = Color(0xFF09090B)          // Pitch black action
+val MonoLightActionText = Color(0xFFFFFFFF)      // White text on dark button
+
+// ============================================================================
+// Functional Semantic Status (Urgency & Error Only)
+// ============================================================================
+val StatusWarning = Color(0xFFF59E0B) // Amber (under 7 seconds)
+val StatusCritical = Color(0xFFEF4444) // Red (under 4 seconds)
+val StatusSuccess = Color(0xFF10B981) // Emerald
+
+// Backward compatibility tokens
+val PrimaryBlue = Color(0xFF2563EB)
+val AccentCyan = Color(0xFF06B6D4)
 val TimerGreen = Color(0xFF10B981)
 val TimerAmber = Color(0xFFF59E0B)
 val TimerRed = Color(0xFFEF4444)
-
-// Obsidian Dark Theme Palette
-val DarkBackground = Color(0xFF0B0D13)
-val DarkSurface = Color(0xFF141822)
-val DarkSurfaceVariant = Color(0xFF1C2230)
-val DarkCard = Color(0xFF171C28)
-val DarkCardBorder = Color(0xFF283144)
-val DarkTextPrimary = Color(0xFFF8FAFC)
-val DarkTextSecondary = Color(0xFF94A3B8)
-val DarkTextMuted = Color(0xFF64748B)
-
-// Pearl Light Theme Palette
-val LightBackground = Color(0xFFF8FAFC)
-val LightSurface = Color(0xFFFFFFFF)
-val LightSurfaceVariant = Color(0xFFF1F5F9)
-val LightCard = Color(0xFFFFFFFF)
-val LightCardBorder = Color(0xFFE2E8F0)
-val LightTextPrimary = Color(0xFF0F172A)
-val LightTextSecondary = Color(0xFF475569)
-val LightTextMuted = Color(0xFF94A3B8)
+val DarkSurface = MonoDarkSurface
+val DarkCard = MonoDarkSurfaceElevated
+val TextPrimary = MonoDarkTextPrimary
+val TextSecondary = MonoDarkTextSecondary
