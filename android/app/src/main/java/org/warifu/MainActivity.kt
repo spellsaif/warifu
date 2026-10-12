@@ -33,6 +33,7 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import org.warifu.security.HardwareKeystoreManager
 import org.warifu.security.SecurityHardening
 import org.warifu.ui.ScannerActivity
+import org.warifu.ui.model.PendingAccount
 import org.warifu.ui.screens.LockScreen
 import org.warifu.ui.screens.TokenListScreen
 import org.warifu.ui.theme.WarifuTheme
@@ -53,7 +54,7 @@ class MainActivity : FragmentActivity() {
         File(filesDir, "wrapped_kek.bin")
     }
 
-    private var showManualInputDialog by mutableStateOf(false)
+    private var pendingAccountSetup by mutableStateOf<PendingAccount?>(null)
     private var showCameraPermissionDeniedDialog by mutableStateOf(false)
     private var crashDumpText by mutableStateOf<String?>(null)
 
@@ -93,20 +94,11 @@ class MainActivity : FragmentActivity() {
         if (requestCode == RC_SCAN && resultCode == RESULT_OK && data != null) {
             val manualInput = data.getBooleanExtra(ScannerActivity.EXTRA_MANUAL_INPUT, false)
             if (manualInput) {
-                showManualInputDialog = true
+                pendingAccountSetup = PendingAccount()
             } else {
                 val scannedText = data.getStringExtra(ScannerActivity.EXTRA_SCAN_RESULT)
                 if (!scannedText.isNullOrBlank()) {
-                    try {
-                        handleIncomingTokenUri(scannedText)
-                    } catch (t: Throwable) {
-                        Log.e("MainActivity", "Failed to process scanned QR code", t)
-                        Toast.makeText(
-                            this,
-                            "Failed to process QR code: ${t.localizedMessage ?: "Invalid format"}",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
+                    handleIncomingTokenUri(scannedText)
                 }
             }
         }
@@ -217,7 +209,7 @@ class MainActivity : FragmentActivity() {
                             TextButton(
                                 onClick = {
                                     showCameraPermissionDeniedDialog = false
-                                    showManualInputDialog = true
+                                    pendingAccountSetup = PendingAccount()
                                 }
                             ) {
                                 Text("Enter Key Manually")
@@ -237,15 +229,22 @@ class MainActivity : FragmentActivity() {
                     else -> {
                         TokenListScreen(
                             state = state,
-                            showManualInputDialog = showManualInputDialog,
-                            onManualInputDialogChange = { showManualInputDialog = it },
+                            pendingAccount = pendingAccountSetup,
+                            onPendingAccountChange = { pendingAccountSetup = it },
+                            onSavePendingAccount = { issuer, account, secret ->
+                                viewModel.addAccount(issuer, account, secret)
+                            },
+                            onImportGoogleConfirmed = { rawUri ->
+                                viewModel.importGoogleMigration(rawUri)
+                            },
+                            onEditToken = { id, oldIssuer, oldAccount, newIssuer, newAccount ->
+                                viewModel.editToken(id, oldIssuer, oldAccount, newIssuer, newAccount)
+                            },
                             onSearchChanged = { viewModel.onSearchQueryChanged(it) },
                             onToggleConceal = { viewModel.toggleConcealCodes() },
                             onCopyCode = { code -> viewModel.copyToken(this@MainActivity, code) },
                             onDeleteToken = { id -> viewModel.deleteToken(id) },
                             onScanQrClicked = { launchScanner() },
-                            onImportGoogleClicked = { launchScanner() },
-                            onManualAddUri = { inputUri -> handleIncomingTokenUri(inputUri) },
                             onLockClicked = { viewModel.lockVault() }
                         )
                     }
@@ -260,37 +259,11 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun handleIncomingTokenUri(rawText: String) {
-        val trimmed = rawText.trim()
-        if (trimmed.isEmpty()) return
-
-        try {
-            if (trimmed.startsWith("otpauth-migration://", ignoreCase = true) ||
-                trimmed.startsWith("otpauth-migration:", ignoreCase = true)) {
-                viewModel.importGoogleMigration(trimmed)
-            } else if (trimmed.startsWith("otpauth://", ignoreCase = true)) {
-                viewModel.addTokenFromUri(trimmed)
-            } else {
-                // Check for common non-2FA QR formats (URLs, WiFi, vCards)
-                if (trimmed.startsWith("http://", ignoreCase = true) ||
-                    trimmed.startsWith("https://", ignoreCase = true) ||
-                    trimmed.startsWith("WIFI:", ignoreCase = true) ||
-                    trimmed.startsWith("BEGIN:", ignoreCase = true)) {
-                    Toast.makeText(this, "Unrecognized QR code: please scan a 2FA OTP QR code", Toast.LENGTH_LONG).show()
-                    return
-                }
-
-                val sanitized = trimmed.replace(" ", "").replace("-", "").uppercase()
-                // Validate Base32 characters: RFC 4648 Base32 alphabet is A-Z and 2-7, plus optional padding '='
-                if (sanitized.matches(Regex("^[A-Z2-7=]+$"))) {
-                    val uri = "otpauth://totp/Warifu:Account?secret=$sanitized&issuer=Warifu"
-                    viewModel.addTokenFromUri(uri)
-                } else {
-                    Toast.makeText(this, "Invalid QR code format: not a valid 2FA secret or URI", Toast.LENGTH_LONG).show()
-                }
-            }
-        } catch (t: Throwable) {
-            Log.e("MainActivity", "Failed to parse token URI", t)
-            Toast.makeText(this, "Failed to import token: ${t.localizedMessage ?: "Invalid payload"}", Toast.LENGTH_LONG).show()
+        val parsed = PendingAccount.parseFromRaw(rawText)
+        if (parsed != null) {
+            pendingAccountSetup = parsed
+        } else {
+            Toast.makeText(this, "Unrecognized QR code or secret key format", Toast.LENGTH_LONG).show()
         }
     }
 
