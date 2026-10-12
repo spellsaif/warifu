@@ -58,6 +58,10 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -65,6 +69,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-process:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
 
     // 2. Jetpack Compose UI & Material 3
@@ -75,14 +80,21 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
 
-    // 3. Hardware Biometric Authentication
+    // 3. Hardware Biometric Authentication & Modern FragmentActivity
     implementation("androidx.biometric:biometric:1.2.0-alpha05")
+    implementation("androidx.fragment:fragment-ktx:1.8.4")
 
-    // 4. Zero-Cloud QR Scanning (Industry-Standard Authenticator Scanner)
-    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    // 4. Zero-Cloud CameraX & ZXing Core (100% Offline QR Scanning)
+    implementation("androidx.camera:camera-camera2:1.3.1")
+    implementation("androidx.camera:camera-lifecycle:1.3.1")
+    implementation("androidx.camera:camera-view:1.3.1")
     implementation("com.google.zxing:core:3.5.3") // 100% offline QR parsing
 
     // 5. UniFFI Runtime
     implementation("net.java.dev.jna:jna:5.14.0@aar")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
+
+    // 6. Unit Testing
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("net.java.dev.jna:jna:5.14.0")
 }
