@@ -15,6 +15,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -24,9 +26,9 @@ import org.warifu.ui.theme.StatusCritical
 import org.warifu.ui.theme.StatusWarning
 
 /**
- * Minimalist, high-precision countdown ring.
- * Features quiet monochromatic styling during steady state, shifting only
- * to warning colors during the final critical seconds.
+ * Minimalist, high-precision countdown ring with TalkBack accessibility semantics.
+ * Features quiet monochromatic styling during steady state, shifting to warning
+ * accents only during the final critical seconds.
  */
 @Composable
 fun CountdownRing(
@@ -58,7 +60,11 @@ fun CountdownRing(
     )
 
     Box(
-        modifier = modifier.size(size),
+        modifier = modifier
+            .size(size)
+            .semantics {
+                contentDescription = "$remainingSeconds seconds remaining until security code refreshes"
+            },
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.size(size)) {
