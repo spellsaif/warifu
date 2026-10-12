@@ -219,4 +219,42 @@ class TokenVectorTest {
             tempVault.delete()
         }
     }
+
+    @Test
+    fun testGoogleMigrationExportAndImportRoundtrip() {
+        val vaultFile1 = File.createTempFile("warifu_migration_1", ".bin")
+        val vaultFile2 = File.createTempFile("warifu_migration_2", ".bin")
+        try {
+            val key1 = ffiGenerateVaultKey()
+            val session1 = VaultSession.createNew(vaultFile1.absolutePath, key1)
+
+            // Add accounts
+            session1.addTokenFromUri("otpauth://totp/GitHub:octocat?secret=JBSWY3DPEHPK3PXP&issuer=GitHub")
+            session1.addTokenFromUri("otpauth://totp/Google:alice?secret=JBSWY3DPEHPK3PXP&issuer=Google")
+
+            val exportedUri = session1.exportGoogleMigration()
+            assertTrue("Exported migration URI must start with otpauth-migration://", exportedUri.startsWith("otpauth-migration://"))
+
+            // Import into clean vault
+            val key2 = ffiGenerateVaultKey()
+            val session2 = VaultSession.createNew(vaultFile2.absolutePath, key2)
+            val count = session2.importGoogleMigration(exportedUri)
+            assertEquals("Must import 2 tokens from Google migration URI", 2u, count)
+
+            val importedTokens = session2.listTokens(1000u)
+            assertEquals(2, importedTokens.size)
+            assertTrue(importedTokens.any { it.issuer == "GitHub" && it.accountName == "octocat" })
+            assertTrue(importedTokens.any { it.issuer == "Google" && it.accountName == "alice" })
+        } finally {
+            vaultFile1.delete()
+            vaultFile2.delete()
+        }
+    }
+
+    @Test
+    fun testSteamGuardGenerationKnownVector() {
+        val secretBytes = "12345678901234567890".toByteArray(Charsets.US_ASCII)
+        val code = org.warifu.security.OtpPreview.generateSteamCode(secretBytes, 1500000000L)
+        assertEquals("Steam Guard token at t=1500000000 must match official vector K23BY", "K23BY", code)
+    }
 }
