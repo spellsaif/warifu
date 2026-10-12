@@ -6,21 +6,33 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
-import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import org.warifu.security.HardwareKeystoreManager
 import org.warifu.security.SecurityHardening
+import org.warifu.ui.ScannerActivity
 import org.warifu.ui.screens.LockScreen
 import org.warifu.ui.screens.TokenListScreen
 import org.warifu.ui.theme.WarifuTheme
@@ -41,56 +53,70 @@ class MainActivity : FragmentActivity() {
         File(filesDir, "wrapped_kek.bin")
     }
 
-    private var isExternalScannerActive by mutableStateOf(false)
-    private var isRequestingPermission by mutableStateOf(false)
     private var showManualInputDialog by mutableStateOf(false)
-    private var showPermissionDeniedDialog by mutableStateOf(false)
+    private var showCameraPermissionDeniedDialog by mutableStateOf(false)
+    private var crashDumpText by mutableStateOf<String?>(null)
 
-    private val barcodeLauncher = registerForActivityResult(ScanContract()) { result ->
-        isExternalScannerActive = false
-        if (result.contents != null) {
-            handleIncomingTokenUri(result.contents)
-        }
+    companion object {
+        private const val RC_CAMERA_PERMISSION = 101
+        private const val RC_SCAN = 102
     }
 
-    private val requestCameraPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        isRequestingPermission = false
-        if (isGranted) {
-            startScanInternal()
-        } else {
-            showPermissionDeniedDialog = true
-        }
-    }
-
-    private fun launchQrScanner() {
+    private fun launchScanner() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-            startScanInternal()
+            val intent = Intent(this, ScannerActivity::class.java)
+            startActivityForResult(intent, RC_SCAN)
         } else {
-            isRequestingPermission = true
-            requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), RC_CAMERA_PERMISSION)
         }
     }
 
-    private fun startScanInternal() {
-        try {
-            isExternalScannerActive = true
-            val options = ScanOptions().apply {
-                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                setPrompt("Point camera at 2FA QR code or Google migration QR")
-                setBeepEnabled(false)
-                setOrientationLocked(false)
-                setBarcodeImageEnabled(false)
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == RC_CAMERA_PERMISSION) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                val intent = Intent(this, ScannerActivity::class.java)
+                startActivityForResult(intent, RC_SCAN)
+            } else {
+                showCameraPermissionDeniedDialog = true
             }
-            barcodeLauncher.launch(options)
-        } catch (e: Exception) {
-            isExternalScannerActive = false
-            Toast.makeText(
-                this,
-                "Scanner error: ${e.localizedMessage ?: e.javaClass.simpleName}",
-                Toast.LENGTH_LONG
-            ).show()
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == RC_SCAN && resultCode == RESULT_OK && data != null) {
+            val manualInput = data.getBooleanExtra(ScannerActivity.EXTRA_MANUAL_INPUT, false)
+            if (manualInput) {
+                showManualInputDialog = true
+            } else {
+                val scannedText = data.getStringExtra(ScannerActivity.EXTRA_SCAN_RESULT)
+                if (!scannedText.isNullOrBlank()) {
+                    try {
+                        handleIncomingTokenUri(scannedText)
+                    } catch (t: Throwable) {
+                        Log.e("MainActivity", "Failed to process scanned QR code", t)
+                        Toast.makeText(
+                            this,
+                            "Failed to process QR code: ${t.localizedMessage ?: "Invalid format"}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            }
+        }
+    }
+
+    private val appLifecycleObserver = object : DefaultLifecycleObserver {
+        override fun onStop(owner: LifecycleOwner) {
+            // When the application as a whole is backgrounded (home button, app switch, screen lock),
+            // sanitize plaintext memory and lock the vault per security rulebook.
+            viewModel.lockVault()
         }
     }
 
@@ -99,6 +125,21 @@ class MainActivity : FragmentActivity() {
 
         // 1. Inviolable Security Rule: Block screenshots, screen recording, and OS task previews
         SecurityHardening.enableFlagSecure(this)
+
+        // 2. Check for crash dump from previous execution
+        try {
+            val crashFile = File(filesDir, "last_crash.txt")
+            if (crashFile.exists()) {
+                val content = crashFile.readText()
+                if (content.isNotBlank()) {
+                    crashDumpText = content
+                }
+                crashFile.delete()
+            }
+        } catch (_: Throwable) {}
+
+        // 3. Register application-wide lifecycle observer for strict memory sanitization on backgrounding
+        ProcessLifecycleOwner.get().lifecycle.addObserver(appLifecycleObserver)
 
         setContent {
             WarifuTheme {
@@ -111,26 +152,62 @@ class MainActivity : FragmentActivity() {
                     }
                 }
 
-                if (showPermissionDeniedDialog) {
+                // Crash diagnostics dialog (if previous session crashed)
+                crashDumpText?.let { dump ->
                     AlertDialog(
-                        onDismissRequest = { showPermissionDeniedDialog = false },
-                        title = { Text("Camera Permission Required", fontWeight = FontWeight.Bold) },
+                        onDismissRequest = { crashDumpText = null },
+                        title = { Text("Crash Diagnostics", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error) },
                         text = {
                             Text(
-                                "Warifu needs camera permission to scan QR codes offline. " +
-                                "You can grant permission in App Settings, or enter your 2FA key manually."
+                                text = dump.take(1500),
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 300.dp)
+                                    .verticalScroll(rememberScrollState())
+                            )
+                        },
+                        confirmButton = {
+                            Button(onClick = { crashDumpText = null }) {
+                                Text("Dismiss")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = {
+                                SecurityHardening.copyTokenToClipboard(this@MainActivity, dump, "Crash Log")
+                                Toast.makeText(this@MainActivity, "Crash log copied to clipboard", Toast.LENGTH_SHORT).show()
+                            }) {
+                                Text("Copy Log")
+                            }
+                        }
+                    )
+                }
+
+                if (showCameraPermissionDeniedDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showCameraPermissionDeniedDialog = false },
+                        title = {
+                            Text("Camera Permission Required", fontWeight = FontWeight.Bold)
+                        },
+                        text = {
+                            Text(
+                                "Warifu scans 2FA QR codes completely offline on your device. " +
+                                "Camera access is needed to scan automatically, or you can enter your key manually."
                             )
                         },
                         confirmButton = {
                             Button(
                                 onClick = {
-                                    showPermissionDeniedDialog = false
+                                    showCameraPermissionDeniedDialog = false
                                     try {
                                         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                                             data = Uri.fromParts("package", packageName, null)
                                         }
                                         startActivity(intent)
-                                    } catch (_: Exception) {}
+                                    } catch (_: Exception) {
+                                        Toast.makeText(this@MainActivity, "Cannot open Settings", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             ) {
                                 Text("Open Settings")
@@ -139,7 +216,7 @@ class MainActivity : FragmentActivity() {
                         dismissButton = {
                             TextButton(
                                 onClick = {
-                                    showPermissionDeniedDialog = false
+                                    showCameraPermissionDeniedDialog = false
                                     showManualInputDialog = true
                                 }
                             ) {
@@ -166,8 +243,8 @@ class MainActivity : FragmentActivity() {
                             onToggleConceal = { viewModel.toggleConcealCodes() },
                             onCopyCode = { code -> viewModel.copyToken(this@MainActivity, code) },
                             onDeleteToken = { id -> viewModel.deleteToken(id) },
-                            onScanQrClicked = { launchQrScanner() },
-                            onImportGoogleClicked = { launchQrScanner() },
+                            onScanQrClicked = { launchScanner() },
+                            onImportGoogleClicked = { launchScanner() },
                             onManualAddUri = { inputUri -> handleIncomingTokenUri(inputUri) },
                             onLockClicked = { viewModel.lockVault() }
                         )
@@ -177,16 +254,43 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        ProcessLifecycleOwner.get().lifecycle.removeObserver(appLifecycleObserver)
+    }
+
     private fun handleIncomingTokenUri(rawText: String) {
         val trimmed = rawText.trim()
-        if (trimmed.startsWith("otpauth-migration://") || trimmed.startsWith("otpauth-migration:")) {
-            viewModel.importGoogleMigration(trimmed)
-        } else if (trimmed.startsWith("otpauth://")) {
-            viewModel.addTokenFromUri(trimmed)
-        } else {
-            val sanitized = trimmed.replace(" ", "").uppercase()
-            val uri = "otpauth://totp/Warifu:Account?secret=$sanitized&issuer=Warifu"
-            viewModel.addTokenFromUri(uri)
+        if (trimmed.isEmpty()) return
+
+        try {
+            if (trimmed.startsWith("otpauth-migration://", ignoreCase = true) ||
+                trimmed.startsWith("otpauth-migration:", ignoreCase = true)) {
+                viewModel.importGoogleMigration(trimmed)
+            } else if (trimmed.startsWith("otpauth://", ignoreCase = true)) {
+                viewModel.addTokenFromUri(trimmed)
+            } else {
+                // Check for common non-2FA QR formats (URLs, WiFi, vCards)
+                if (trimmed.startsWith("http://", ignoreCase = true) ||
+                    trimmed.startsWith("https://", ignoreCase = true) ||
+                    trimmed.startsWith("WIFI:", ignoreCase = true) ||
+                    trimmed.startsWith("BEGIN:", ignoreCase = true)) {
+                    Toast.makeText(this, "Unrecognized QR code: please scan a 2FA OTP QR code", Toast.LENGTH_LONG).show()
+                    return
+                }
+
+                val sanitized = trimmed.replace(" ", "").replace("-", "").uppercase()
+                // Validate Base32 characters: RFC 4648 Base32 alphabet is A-Z and 2-7, plus optional padding '='
+                if (sanitized.matches(Regex("^[A-Z2-7=]+$"))) {
+                    val uri = "otpauth://totp/Warifu:Account?secret=$sanitized&issuer=Warifu"
+                    viewModel.addTokenFromUri(uri)
+                } else {
+                    Toast.makeText(this, "Invalid QR code format: not a valid 2FA secret or URI", Toast.LENGTH_LONG).show()
+                }
+            }
+        } catch (t: Throwable) {
+            Log.e("MainActivity", "Failed to parse token URI", t)
+            Toast.makeText(this, "Failed to import token: ${t.localizedMessage ?: "Invalid payload"}", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -271,9 +375,8 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
-        // Only sanitize and lock memory when user actually leaves the app,
-        // not during camera scans, permission dialogs, or configuration changes
-        if (!isRequestingPermission && !isExternalScannerActive && !showManualInputDialog && !isChangingConfigurations) {
+        // If the activity is finishing (user exited the app), lock vault immediately
+        if (isFinishing) {
             viewModel.lockVault()
         }
     }
