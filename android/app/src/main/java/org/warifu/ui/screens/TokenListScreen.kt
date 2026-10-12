@@ -2,13 +2,15 @@ package org.warifu.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -17,19 +19,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.warifu.security.OtpPreview
+import org.warifu.ui.components.ServiceAvatar
 import org.warifu.ui.components.TokenCard
 import org.warifu.ui.components.WarifuLogo
 import org.warifu.ui.model.PendingAccount
+import org.warifu.ui.theme.StatusWarning
 import org.warifu.ui.viewmodel.AuthUiState
+import org.warifu.ui.viewmodel.TokenSortOrder
 import uniffi.warifu_core.TokenView
 
 /**
  * World-class 2FA account management screen.
- * Monochromatic elegance, native ergonomics, and full account naming control.
+ * Features fast search, pinning, tag filters, sorting, live preview validation,
+ * duplicate detection, and Google migration account previews.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,9 +46,13 @@ fun TokenListScreen(
     state: AuthUiState,
     pendingAccount: PendingAccount?,
     onPendingAccountChange: (PendingAccount?) -> Unit,
-    onSavePendingAccount: (issuer: String, account: String, secret: String) -> Unit,
+    onSavePendingAccount: (issuer: String, account: String, secret: String, period: Int, digits: Int, tag: String, isSteam: Boolean) -> Unit,
     onImportGoogleConfirmed: (String) -> Unit,
-    onEditToken: (id: String, oldIssuer: String, oldAccount: String, newIssuer: String, newAccount: String) -> Unit,
+    onEditToken: (id: String, oldIssuer: String, oldAccount: String, newIssuer: String, newAccount: String, newTag: String) -> Unit,
+    onTogglePin: (String) -> Unit,
+    onQuickReveal: (String) -> Unit,
+    onTagSelected: (String?) -> Unit,
+    onSortOrderChanged: (TokenSortOrder) -> Unit,
     onSearchChanged: (String) -> Unit,
     onToggleConceal: () -> Unit,
     onCopyCode: (String) -> Unit,
@@ -49,6 +62,7 @@ fun TokenListScreen(
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    var showSortMenu by remember { mutableStateOf(false) }
     var showAddMenuSheet by remember { mutableStateOf(false) }
     var isSearchActive by remember { mutableStateOf(false) }
 
@@ -96,6 +110,7 @@ fun TokenListScreen(
     tokenToEdit?.let { token ->
         var editIssuer by remember(token) { mutableStateOf(token.issuer) }
         var editAccount by remember(token) { mutableStateOf(token.accountName) }
+        var editTag by remember(token) { mutableStateOf(token.tags.firstOrNull().orEmpty()) }
 
         ModalBottomSheet(
             onDismissRequest = { tokenToEdit = null },
@@ -139,6 +154,30 @@ fun TokenListScreen(
                     shape = RoundedCornerShape(10.dp)
                 )
 
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Tag Selector
+                Text(
+                    text = "Category / Folder",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf("Personal", "Work", "Finance", "Social", "Dev").forEach { tagOption ->
+                        FilterChip(
+                            selected = editTag == tagOption,
+                            onClick = { editTag = if (editTag == tagOption) "" else tagOption },
+                            label = { Text(tagOption, fontSize = 12.sp) }
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Row(
@@ -157,7 +196,14 @@ fun TokenListScreen(
 
                     Button(
                         onClick = {
-                            onEditToken(token.id, token.issuer, token.accountName, editIssuer.trim(), editAccount.trim())
+                            onEditToken(
+                                token.id,
+                                token.issuer,
+                                token.accountName,
+                                editIssuer.trim(),
+                                editAccount.trim(),
+                                editTag.trim()
+                            )
                             tokenToEdit = null
                         },
                         modifier = Modifier
@@ -177,10 +223,10 @@ fun TokenListScreen(
         }
     }
 
-    // Pending Account Save Sheet (Prompts user for Service Name & Account Name)
+    // Pending Account Save Sheet
     pendingAccount?.let { pending ->
         if (pending.isMigration) {
-            // Google Migration Confirmation Sheet
+            // Google Migration Preview & Confirmation Sheet
             ModalBottomSheet(
                 onDismissRequest = { onPendingAccountChange(null) },
                 containerColor = MaterialTheme.colorScheme.surface,
@@ -199,13 +245,67 @@ fun TokenListScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
+                    val duplicateCount = pending.migrationPreviews.count { it.isDuplicate }
                     Text(
-                        text = "A Google Authenticator transfer QR code was recognized. Import all accounts into your vault?",
+                        text = if (duplicateCount > 0) {
+                            "Found ${pending.migrationPreviews.size} accounts ($duplicateCount already exist in your vault):"
+                        } else {
+                            "Found ${pending.migrationPreviews.size} accounts ready to import:"
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Scrollable list of accounts in migration payload
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 240.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(pending.migrationPreviews) { item ->
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    ServiceAvatar(issuer = item.issuer, accountName = item.accountName, size = 32.dp)
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(item.issuer, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                                        if (item.accountName.isNotBlank()) {
+                                            Text(item.accountName, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+                                    if (item.isDuplicate) {
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = StatusWarning.copy(alpha = 0.15f)
+                                        ) {
+                                            Text(
+                                                text = "Exists",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = StatusWarning,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
@@ -237,16 +337,46 @@ fun TokenListScreen(
                                 contentColor = MaterialTheme.colorScheme.onPrimary
                             )
                         ) {
-                            Text("Import Accounts")
+                            Text("Import All (${pending.migrationPreviews.size})")
                         }
                     }
                 }
             }
         } else {
-            // Standard Account Naming & Save Sheet
+            // Standard Account Naming & Save Sheet with live preview & duplicate detection
             var issuerInput by remember(pending) { mutableStateOf(pending.initialIssuer) }
             var accountInput by remember(pending) { mutableStateOf(pending.initialAccount) }
             var secretInput by remember(pending) { mutableStateOf(pending.secret) }
+            var selectedTagInput by remember(pending) { mutableStateOf(pending.tag) }
+            var isSteamType by remember(pending) { mutableStateOf(pending.isSteam) }
+            var selectedPeriod by remember(pending) { mutableStateOf(pending.period) }
+
+            // Live Base32 validation error
+            val secretError = remember(secretInput) {
+                if (secretInput.isBlank()) null else OtpPreview.validateBase32Secret(secretInput)
+            }
+
+            // Live generated OTP code preview
+            val livePreviewCode = remember(secretInput, isSteamType, selectedPeriod) {
+                if (secretError == null && secretInput.isNotBlank()) {
+                    OtpPreview.generateLivePreview(
+                        secretBase32 = secretInput,
+                        isSteam = isSteamType,
+                        period = selectedPeriod,
+                        digits = 6
+                    )
+                } else null
+            }
+
+            // Live Duplicate Check
+            val duplicateFound = remember(issuerInput, accountInput, state.tokens) {
+                if (issuerInput.isNotBlank()) {
+                    state.tokens.firstOrNull {
+                        it.issuer.trim().equals(issuerInput.trim(), ignoreCase = true) &&
+                        it.accountName.trim().equals(accountInput.trim(), ignoreCase = true)
+                    }
+                } else null
+            }
 
             ModalBottomSheet(
                 onDismissRequest = { onPendingAccountChange(null) },
@@ -266,15 +396,32 @@ fun TokenListScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                    Text(
-                        text = "Confirm or set the name for this account:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Spacer(modifier = Modifier.height(18.dp))
+                    // Duplicate Warning Banner
+                    if (duplicateFound != null) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = StatusWarning.copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, StatusWarning.copy(alpha = 0.4f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Warning, contentDescription = null, tint = StatusWarning, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "An account for \"${duplicateFound.issuer}\" already exists in your vault.",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
 
                     OutlinedTextField(
                         value = issuerInput,
@@ -286,7 +433,7 @@ fun TokenListScreen(
                         shape = RoundedCornerShape(10.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     OutlinedTextField(
                         value = accountInput,
@@ -298,7 +445,7 @@ fun TokenListScreen(
                         shape = RoundedCornerShape(10.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     OutlinedTextField(
                         value = secretInput,
@@ -306,14 +453,99 @@ fun TokenListScreen(
                         label = { Text("Secret Key") },
                         placeholder = { Text("Base32 secret key") },
                         singleLine = true,
+                        isError = secretError != null,
+                        supportingText = {
+                            if (secretError != null) {
+                                Text(secretError, color = MaterialTheme.colorScheme.error)
+                            } else {
+                                Text("Letters A-Z and digits 2-7. Spaces are automatically stripped.")
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        readOnly = pending.secret.isNotBlank()
+                        shape = RoundedCornerShape(10.dp)
                     )
+
+                    // Live Code Preview Pill
+                    if (livePreviewCode != null) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Live Code Preview:",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = livePreviewCode,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Token Type Selection Chips
+                    Text("Type", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = !isSteamType && selectedPeriod == 30,
+                            onClick = { isSteamType = false; selectedPeriod = 30 },
+                            label = { Text("TOTP (30s)", fontSize = 12.sp) }
+                        )
+                        FilterChip(
+                            selected = isSteamType,
+                            onClick = { isSteamType = true },
+                            label = { Text("Steam Guard", fontSize = 12.sp) }
+                        )
+                        FilterChip(
+                            selected = !isSteamType && selectedPeriod == 60,
+                            onClick = { isSteamType = false; selectedPeriod = 60 },
+                            label = { Text("TOTP (60s)", fontSize = 12.sp) }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Category Tags
+                    Text("Category / Folder", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("Personal", "Work", "Finance", "Social", "Dev").forEach { tagOption ->
+                            FilterChip(
+                                selected = selectedTagInput == tagOption,
+                                onClick = { selectedTagInput = if (selectedTagInput == tagOption) "" else tagOption },
+                                label = { Text(tagOption, fontSize = 12.sp) }
+                            )
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    val canSave = (issuerInput.isNotBlank() || accountInput.isNotBlank()) && secretInput.isNotBlank()
+                    val canSave = (issuerInput.isNotBlank() || accountInput.isNotBlank()) &&
+                            secretInput.isNotBlank() &&
+                            secretError == null
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -334,7 +566,11 @@ fun TokenListScreen(
                                 onSavePendingAccount(
                                     issuerInput.trim(),
                                     accountInput.trim(),
-                                    secretInput.trim()
+                                    secretInput.trim(),
+                                    selectedPeriod,
+                                    6,
+                                    selectedTagInput.trim(),
+                                    isSteamType
                                 )
                                 onPendingAccountChange(null)
                             },
@@ -421,7 +657,7 @@ fun TokenListScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -437,6 +673,21 @@ fun TokenListScreen(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
+                        if (state.tokens.isNotEmpty()) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant
+                            ) {
+                                Text(
+                                    text = "${state.tokens.size}",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -447,16 +698,64 @@ fun TokenListScreen(
                         }) {
                             Icon(
                                 imageVector = if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
-                                contentDescription = "Search",
+                                contentDescription = "Search accounts",
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
+                        }
+
+                        // Sort icon & dropdown
+                        Box {
+                            IconButton(onClick = { showSortMenu = true }) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Sort,
+                                    contentDescription = "Sort accounts",
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showSortMenu,
+                                onDismissRequest = { showSortMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Service (A → Z)") },
+                                    leadingIcon = { if (state.sortOrder == TokenSortOrder.ISSUER_ASC) Icon(Icons.Default.Check, null) },
+                                    onClick = {
+                                        onSortOrderChanged(TokenSortOrder.ISSUER_ASC)
+                                        showSortMenu = false
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Service (Z → A)") },
+                                    leadingIcon = { if (state.sortOrder == TokenSortOrder.ISSUER_DESC) Icon(Icons.Default.Check, null) },
+                                    onClick = {
+                                        onSortOrderChanged(TokenSortOrder.ISSUER_DESC)
+                                        showSortMenu = false
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Account Name (A → Z)") },
+                                    leadingIcon = { if (state.sortOrder == TokenSortOrder.ACCOUNT_ASC) Icon(Icons.Default.Check, null) },
+                                    onClick = {
+                                        onSortOrderChanged(TokenSortOrder.ACCOUNT_ASC)
+                                        showSortMenu = false
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Expiring Soon First") },
+                                    leadingIcon = { if (state.sortOrder == TokenSortOrder.EXPIRING_SOON) Icon(Icons.Default.Check, null) },
+                                    onClick = {
+                                        onSortOrderChanged(TokenSortOrder.EXPIRING_SOON)
+                                        showSortMenu = false
+                                    }
+                                )
+                            }
                         }
 
                         // Conceal codes icon
                         IconButton(onClick = onToggleConceal) {
                             Icon(
                                 imageVector = if (state.areCodesConcealed) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                contentDescription = "Toggle Conceal",
+                                contentDescription = "Toggle conceal codes",
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -465,7 +764,7 @@ fun TokenListScreen(
                         IconButton(onClick = onLockClicked) {
                             Icon(
                                 imageVector = Icons.Default.Lock,
-                                contentDescription = "Lock Vault",
+                                contentDescription = "Lock vault",
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -475,7 +774,7 @@ fun TokenListScreen(
                             IconButton(onClick = { showMenu = true }) {
                                 Icon(
                                     imageVector = Icons.Default.MoreVert,
-                                    contentDescription = "Menu",
+                                    contentDescription = "Options menu",
                                     tint = MaterialTheme.colorScheme.onSurface
                                 )
                             }
@@ -514,20 +813,20 @@ fun TokenListScreen(
                     }
                 }
 
-                // Inline search bar when toggled
+                // Inline search bar
                 AnimatedVisibility(visible = isSearchActive) {
                     Column(modifier = Modifier.padding(top = 8.dp)) {
                         OutlinedTextField(
                             value = state.searchQuery,
                             onValueChange = onSearchChanged,
-                            placeholder = { Text("Search accounts...", fontSize = 14.sp) },
+                            placeholder = { Text("Search accounts or tags...", fontSize = 14.sp) },
                             leadingIcon = {
                                 Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
                             },
                             trailingIcon = {
                                 if (state.searchQuery.isNotEmpty()) {
                                     IconButton(onClick = { onSearchChanged("") }) {
-                                        Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(16.dp))
+                                        Icon(Icons.Default.Clear, contentDescription = "Clear search", modifier = Modifier.size(16.dp))
                                     }
                                 }
                             },
@@ -535,6 +834,44 @@ fun TokenListScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(10.dp)
                         )
+                    }
+                }
+
+                // Horizontal Category / Tag Filters row
+                if (state.tokens.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        FilterChip(
+                            selected = state.selectedTag == null || state.selectedTag == "All",
+                            onClick = { onTagSelected(null) },
+                            label = { Text("All", fontSize = 12.sp) }
+                        )
+
+                        val pinnedCount = state.tokens.count { state.pinnedTokenIds.contains(it.id) || it.isPinned }
+                        if (pinnedCount > 0) {
+                            FilterChip(
+                                selected = state.selectedTag == "Pinned",
+                                onClick = { onTagSelected(if (state.selectedTag == "Pinned") null else "Pinned") },
+                                leadingIcon = { Icon(Icons.Default.PushPin, null, modifier = Modifier.size(12.dp)) },
+                                label = { Text("Pinned ($pinnedCount)", fontSize = 12.sp) }
+                            )
+                        }
+
+                        listOf("Personal", "Work", "Finance", "Social", "Dev").forEach { tag ->
+                            val count = state.tokens.count { it.tags.any { t -> t.equals(tag, ignoreCase = true) } }
+                            if (count > 0 || state.selectedTag == tag) {
+                                FilterChip(
+                                    selected = state.selectedTag == tag,
+                                    onClick = { onTagSelected(if (state.selectedTag == tag) null else tag) },
+                                    label = { Text(if (count > 0) "$tag ($count)" else tag, fontSize = 12.sp) }
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -574,7 +911,7 @@ fun TokenListScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = if (state.searchQuery.isEmpty()) "No Accounts" else "No matching accounts",
+                        text = if (state.searchQuery.isEmpty() && state.selectedTag == null) "No Accounts" else "No matching accounts",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -583,17 +920,17 @@ fun TokenListScreen(
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Text(
-                        text = if (state.searchQuery.isEmpty()) {
+                        text = if (state.searchQuery.isEmpty() && state.selectedTag == null) {
                             "Tap + to scan a QR code or enter a setup key."
                         } else {
-                            "Check for typos or clear your search query."
+                            "Check for typos or clear your active filters."
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
                     )
 
-                    if (state.searchQuery.isEmpty()) {
+                    if (state.searchQuery.isEmpty() && state.selectedTag == null) {
                         Spacer(modifier = Modifier.height(24.dp))
 
                         Button(
@@ -624,7 +961,10 @@ fun TokenListScreen(
                         TokenCard(
                             token = token,
                             isConcealed = state.areCodesConcealed,
+                            isIndividuallyRevealed = state.revealedTokenIds.contains(token.id),
                             onCopyCode = onCopyCode,
+                            onTogglePin = { onTogglePin(token.id) },
+                            onQuickReveal = { onQuickReveal(token.id) },
                             onEdit = { tokenToEdit = token },
                             onDelete = { tokenToDelete = token }
                         )
