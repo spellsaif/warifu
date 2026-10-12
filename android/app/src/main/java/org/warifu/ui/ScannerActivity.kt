@@ -93,7 +93,7 @@ class ScannerActivity : ComponentActivity() {
                 }
                 background = GradientDrawable().apply {
                     setColor(Color.TRANSPARENT)
-                    setStroke(reticleBorderPx, Color.parseColor("#64B5F6"))
+                    setStroke(reticleBorderPx, Color.WHITE)
                     cornerRadius = reticleCornerPx
                 }
             }
@@ -101,8 +101,8 @@ class ScannerActivity : ComponentActivity() {
 
             // 6. Guidance text
             val instructionText = TextView(this).apply {
-                text = "Point camera at 2FA QR code or Google migration QR"
-                setTextColor(Color.parseColor("#E0E0E0"))
+                text = "Align QR code within the frame"
+                setTextColor(Color.parseColor("#FAFAFA"))
                 textSize = 14f
                 gravity = Gravity.CENTER
                 layoutParams = FrameLayout.LayoutParams(
