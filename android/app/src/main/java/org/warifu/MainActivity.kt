@@ -231,15 +231,19 @@ class MainActivity : FragmentActivity() {
                             state = state,
                             pendingAccount = pendingAccountSetup,
                             onPendingAccountChange = { pendingAccountSetup = it },
-                            onSavePendingAccount = { issuer, account, secret ->
-                                viewModel.addAccount(issuer, account, secret)
+                            onSavePendingAccount = { issuer, account, secret, period, digits, tag, isSteam ->
+                                viewModel.addAccount(issuer, account, secret, period, digits, tag, isSteam)
                             },
                             onImportGoogleConfirmed = { rawUri ->
                                 viewModel.importGoogleMigration(rawUri)
                             },
-                            onEditToken = { id, oldIssuer, oldAccount, newIssuer, newAccount ->
-                                viewModel.editToken(id, oldIssuer, oldAccount, newIssuer, newAccount)
+                            onEditToken = { id, oldIssuer, oldAccount, newIssuer, newAccount, newTag ->
+                                viewModel.editToken(id, oldIssuer, oldAccount, newIssuer, newAccount, newTag)
                             },
+                            onTogglePin = { id -> viewModel.togglePin(id) },
+                            onQuickReveal = { id -> viewModel.quickRevealToken(id) },
+                            onTagSelected = { tag -> viewModel.onTagSelected(tag) },
+                            onSortOrderChanged = { sort -> viewModel.onSortOrderChanged(sort) },
                             onSearchChanged = { viewModel.onSearchQueryChanged(it) },
                             onToggleConceal = { viewModel.toggleConcealCodes() },
                             onCopyCode = { code -> viewModel.copyToken(this@MainActivity, code) },
