@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
@@ -221,11 +222,11 @@ fun TokenDetailScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 DetailActionTile(
-                    icon = Icons.Outlined.ContentCopy,
-                    label = if (justCopied) "Copied!" else "Copy",
+                    icon = if (justCopied) Icons.Default.Check else Icons.Outlined.ContentCopy,
+                    label = if (justCopied) "Copied" else "Copy",
                     onClick = handleCopy,
                     modifier = Modifier.weight(1f),
-                    tint = if (justCopied) SakuraPink else Color.White
+                    tint = Color.White
                 )
 
                 DetailActionTile(
