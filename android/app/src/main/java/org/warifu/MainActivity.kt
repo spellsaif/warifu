@@ -32,9 +32,12 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import org.warifu.security.HardwareKeystoreManager
 import org.warifu.security.SecurityHardening
+import androidx.activity.compose.BackHandler
 import org.warifu.ui.ScannerActivity
 import org.warifu.ui.model.PendingAccount
+import org.warifu.ui.screens.AddAccountScreen
 import org.warifu.ui.screens.LockScreen
+import org.warifu.ui.screens.TokenDetailScreen
 import org.warifu.ui.screens.TokenListScreen
 import org.warifu.ui.theme.WarifuTheme
 import org.warifu.ui.viewmodel.AuthViewModel
@@ -55,6 +58,8 @@ class MainActivity : FragmentActivity() {
     }
 
     private var pendingAccountSetup by mutableStateOf<PendingAccount?>(null)
+    private var selectedTokenId by mutableStateOf<String?>(null)
+    private var showAddAccountScreen by mutableStateOf(false)
     private var showCameraPermissionDeniedDialog by mutableStateOf(false)
     private var crashDumpText by mutableStateOf<String?>(null)
 
@@ -223,7 +228,51 @@ class MainActivity : FragmentActivity() {
                         LockScreen(
                             hasExistingVault = vaultFile.exists() && wrappedKeyFile.exists(),
                             onUnlockClicked = { promptBiometricUnlock() },
-                            onCreateVaultClicked = { initializeFreshVault() }
+                            onCreateVaultClicked = { initializeFreshVault() },
+                            onImportClicked = { launchScanner() }
+                        )
+                    }
+                    selectedTokenId != null -> {
+                        val currentToken = state.tokens.firstOrNull { it.id == selectedTokenId }
+                        if (currentToken != null) {
+                            BackHandler { selectedTokenId = null }
+                            TokenDetailScreen(
+                                token = currentToken,
+                                onBack = { selectedTokenId = null },
+                                onCopyCode = { code -> viewModel.copyToken(this@MainActivity, code) },
+                                onRefresh = { viewModel.refreshTokens() },
+                                onEdit = {
+                                    pendingAccountSetup = PendingAccount(
+                                        initialIssuer = currentToken.issuer,
+                                        initialAccount = currentToken.accountName,
+                                        tag = if (currentToken.tags.isNotEmpty()) currentToken.tags[0] else ""
+                                    )
+                                },
+                                onEditToken = { id, oldIssuer, oldAccount, newIssuer, newAccount, newTag ->
+                                    viewModel.editToken(id, oldIssuer, oldAccount, newIssuer, newAccount, newTag)
+                                },
+                                onDelete = {
+                                    viewModel.deleteToken(currentToken.id)
+                                    selectedTokenId = null
+                                },
+                                onTogglePin = { viewModel.togglePin(currentToken.id) }
+                            )
+                        } else {
+                            selectedTokenId = null
+                        }
+                    }
+                    showAddAccountScreen -> {
+                        BackHandler { showAddAccountScreen = false }
+                        AddAccountScreen(
+                            onBack = { showAddAccountScreen = false },
+                            onScanQrClicked = {
+                                showAddAccountScreen = false
+                                launchScanner()
+                            },
+                            onEnterKeyManuallyClicked = { prefilledIssuer ->
+                                showAddAccountScreen = false
+                                pendingAccountSetup = PendingAccount(initialIssuer = prefilledIssuer ?: "")
+                            }
                         )
                     }
                     else -> {
@@ -249,7 +298,18 @@ class MainActivity : FragmentActivity() {
                             onCopyCode = { code -> viewModel.copyToken(this@MainActivity, code) },
                             onDeleteToken = { id -> viewModel.deleteToken(id) },
                             onScanQrClicked = { launchScanner() },
-                            onLockClicked = { viewModel.lockVault() }
+                            onLockClicked = {
+                                selectedTokenId = null
+                                showAddAccountScreen = false
+                                viewModel.lockVault()
+                            },
+                            onSelectToken = { selectedTokenId = it.id },
+                            onAddAccountClicked = { showAddAccountScreen = true },
+                            onSettingsClicked = {
+                                selectedTokenId = null
+                                showAddAccountScreen = false
+                                viewModel.lockVault()
+                            }
                         )
                     }
                 }
