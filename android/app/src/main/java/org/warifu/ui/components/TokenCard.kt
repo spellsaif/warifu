@@ -84,7 +84,7 @@ fun TokenCard(
             },
         shape = RoundedCornerShape(16.dp),
         color = WarifuSurface,
-        border = BorderStroke(1.dp, if (token.isPinned) SakuraPink.copy(alpha = 0.5f) else WarifuBorder)
+        border = BorderStroke(1.dp, if (token.isPinned) Color.White.copy(alpha = 0.35f) else WarifuBorder)
     ) {
         Row(
             modifier = Modifier
@@ -120,7 +120,7 @@ fun TokenCard(
                         Icon(
                             imageVector = Icons.Default.PushPin,
                             contentDescription = "Pinned",
-                            tint = SakuraPink,
+                            tint = Color.White,
                             modifier = Modifier.size(13.dp)
                         )
                     }
@@ -129,14 +129,15 @@ fun TokenCard(
                         Spacer(modifier = Modifier.width(6.dp))
                         Surface(
                             shape = RoundedCornerShape(4.dp),
-                            color = Color(0xFF1E2026)
+                            color = Color(0xFF1A1A1E),
+                            border = BorderStroke(1.dp, Color(0xFF282830))
                         ) {
                             Text(
                                 text = token.tags[0],
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = WarifuTextSecondary,
-                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
                     }
@@ -165,10 +166,10 @@ fun TokenCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = formattedCode,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.SansSerif,
-                        letterSpacing = 1.sp,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.5.sp,
                         color = if (token.remainingSeconds <= 4u) StatusCritical else Color.White
                     )
 
@@ -176,7 +177,7 @@ fun TokenCard(
                         Spacer(modifier = Modifier.width(8.dp))
                         Surface(
                             shape = RoundedCornerShape(10.dp),
-                            color = SakuraPink.copy(alpha = 0.18f),
+                            color = Color.White.copy(alpha = 0.12f),
                             modifier = Modifier.height(20.dp)
                         ) {
                             Row(
@@ -186,7 +187,7 @@ fun TokenCard(
                                 Icon(
                                     imageVector = Icons.Default.Check,
                                     contentDescription = null,
-                                    tint = SakuraPink,
+                                    tint = Color.White,
                                     modifier = Modifier.size(11.dp)
                                 )
                                 Spacer(modifier = Modifier.width(3.dp))
@@ -194,7 +195,7 @@ fun TokenCard(
                                     text = "Copied",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = SakuraPink
+                                    color = Color.White
                                 )
                             }
                         }
