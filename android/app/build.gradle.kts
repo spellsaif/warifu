@@ -79,6 +79,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("br.com.devsrsouza.compose.icons:simple-icons:1.1.1")
 
     // 3. Hardware Biometric Authentication & Modern FragmentActivity
     implementation("androidx.biometric:biometric:1.2.0-alpha05")
