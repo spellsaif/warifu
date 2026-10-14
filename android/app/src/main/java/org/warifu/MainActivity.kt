@@ -37,6 +37,7 @@ import org.warifu.ui.ScannerActivity
 import org.warifu.ui.model.PendingAccount
 import org.warifu.ui.screens.AddAccountScreen
 import org.warifu.ui.screens.LockScreen
+import org.warifu.ui.screens.SettingsScreen
 import org.warifu.ui.screens.TokenDetailScreen
 import org.warifu.ui.screens.TokenListScreen
 import org.warifu.ui.theme.WarifuTheme
@@ -60,6 +61,7 @@ class MainActivity : FragmentActivity() {
     private var pendingAccountSetup by mutableStateOf<PendingAccount?>(null)
     private var selectedTokenId by mutableStateOf<String?>(null)
     private var showAddAccountScreen by mutableStateOf(false)
+    private var showSettingsScreen by mutableStateOf(false)
     private var showCameraPermissionDeniedDialog by mutableStateOf(false)
     private var crashDumpText by mutableStateOf<String?>(null)
 
@@ -275,6 +277,27 @@ class MainActivity : FragmentActivity() {
                             }
                         )
                     }
+                    showSettingsScreen -> {
+                        BackHandler { showSettingsScreen = false }
+                        SettingsScreen(
+                            onBack = { showSettingsScreen = false },
+                            onLockVault = {
+                                showSettingsScreen = false
+                                viewModel.lockVault()
+                            },
+                            onScanQrClicked = {
+                                showSettingsScreen = false
+                                launchScanner()
+                            },
+                            onManualAddClicked = {
+                                showSettingsScreen = false
+                                pendingAccountSetup = PendingAccount()
+                            },
+                            onToggleConceal = { viewModel.toggleConcealCodes() },
+                            areCodesConcealed = state.areCodesConcealed,
+                            tokenCount = state.tokens.size
+                        )
+                    }
                     else -> {
                         TokenListScreen(
                             state = state,
@@ -301,6 +324,7 @@ class MainActivity : FragmentActivity() {
                             onLockClicked = {
                                 selectedTokenId = null
                                 showAddAccountScreen = false
+                                showSettingsScreen = false
                                 viewModel.lockVault()
                             },
                             onSelectToken = { selectedTokenId = it.id },
@@ -308,8 +332,9 @@ class MainActivity : FragmentActivity() {
                             onSettingsClicked = {
                                 selectedTokenId = null
                                 showAddAccountScreen = false
-                                viewModel.lockVault()
-                            }
+                                showSettingsScreen = true
+                            },
+                            onAddCategory = { category -> viewModel.addCategory(category) }
                         )
                     }
                 }
