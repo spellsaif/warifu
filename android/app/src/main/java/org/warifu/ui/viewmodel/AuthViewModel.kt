@@ -31,6 +31,7 @@ data class AuthUiState(
     val filteredTokens: List<TokenView> = emptyList(),
     val searchQuery: String = "",
     val selectedTag: String? = null,              // null = "All"
+    val customCategories: List<String> = listOf("Personal", "Work", "Crypto"),
     val pinnedTokenIds: Set<String> = emptySet(),
     val tokenTags: Map<String, String> = emptyMap(), // tokenId -> Tag name
     val revealedTokenIds: Set<String> = emptySet(), // Individually revealed tokens
@@ -188,6 +189,36 @@ class AuthViewModel : ViewModel() {
                     tokens = state.tokens,
                     query = state.searchQuery,
                     tag = tag,
+                    sort = state.sortOrder,
+                    pinnedIds = state.pinnedTokenIds
+                )
+            )
+        }
+    }
+
+    fun addCategory(category: String) {
+        val clean = category.trim()
+        if (clean.isBlank()) return
+        _uiState.update { state ->
+            if (state.customCategories.any { it.equals(clean, ignoreCase = true) }) {
+                state
+            } else {
+                state.copy(customCategories = state.customCategories + clean)
+            }
+        }
+    }
+
+    fun deleteCategory(category: String) {
+        _uiState.update { state ->
+            val updated = state.customCategories.filterNot { it.equals(category, ignoreCase = true) }
+            val newSelected = if (state.selectedTag.equals(category, ignoreCase = true)) null else state.selectedTag
+            state.copy(
+                customCategories = updated,
+                selectedTag = newSelected,
+                filteredTokens = processTokens(
+                    tokens = state.tokens,
+                    query = state.searchQuery,
+                    tag = newSelected,
                     sort = state.sortOrder,
                     pinnedIds = state.pinnedTokenIds
                 )
