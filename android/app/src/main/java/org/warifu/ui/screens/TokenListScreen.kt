@@ -59,6 +59,9 @@ fun TokenListScreen(
     onDeleteToken: (String) -> Unit,
     onScanQrClicked: () -> Unit,
     onLockClicked: () -> Unit,
+    onSelectToken: (TokenView) -> Unit = {},
+    onAddAccountClicked: () -> Unit = onScanQrClicked,
+    onSettingsClicked: () -> Unit = onLockClicked,
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -837,58 +840,86 @@ fun TokenListScreen(
                     }
                 }
 
-                // Horizontal Category / Tag Filters row
+                // Horizontal Category / Tag Filters row (Screen 2 ui.png)
                 if (state.tokens.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        FilterChip(
-                            selected = state.selectedTag == null || state.selectedTag == "All",
-                            onClick = { onTagSelected(null) },
-                            label = { Text("All", fontSize = 12.sp) }
-                        )
+                        val predefinedCategories = listOf("All", "Personal", "Work", "Crypto")
+                        predefinedCategories.forEach { category ->
+                            val isSelected = if (category == "All") state.selectedTag == null || state.selectedTag == "All"
+                            else state.selectedTag.equals(category, ignoreCase = true)
 
-                        val pinnedCount = state.tokens.count { state.pinnedTokenIds.contains(it.id) || it.isPinned }
-                        if (pinnedCount > 0) {
-                            FilterChip(
-                                selected = state.selectedTag == "Pinned",
-                                onClick = { onTagSelected(if (state.selectedTag == "Pinned") null else "Pinned") },
-                                leadingIcon = { Icon(Icons.Default.PushPin, null, modifier = Modifier.size(12.dp)) },
-                                label = { Text("Pinned ($pinnedCount)", fontSize = 12.sp) }
+                            FilterPill(
+                                label = category,
+                                isSelected = isSelected,
+                                onClick = {
+                                    if (category == "All") onTagSelected(null)
+                                    else onTagSelected(if (isSelected) null else category)
+                                }
                             )
                         }
 
-                        listOf("Personal", "Work", "Finance", "Social", "Dev").forEach { tag ->
-                            val count = state.tokens.count { it.tags.any { t -> t.equals(tag, ignoreCase = true) } }
-                            if (count > 0 || state.selectedTag == tag) {
-                                FilterChip(
-                                    selected = state.selectedTag == tag,
-                                    onClick = { onTagSelected(if (state.selectedTag == tag) null else tag) },
-                                    label = { Text(if (count > 0) "$tag ($count)" else tag, fontSize = 12.sp) }
-                                )
-                            }
+                        // Any dynamic custom tags from user's accounts
+                        val extraTags = state.tokens.flatMap { it.tags }
+                            .distinct()
+                            .filterNot { tag -> predefinedCategories.any { it.equals(tag, ignoreCase = true) } }
+
+                        extraTags.forEach { customTag ->
+                            val isSelected = state.selectedTag.equals(customTag, ignoreCase = true)
+                            FilterPill(
+                                label = customTag,
+                                isSelected = isSelected,
+                                onClick = { onTagSelected(if (isSelected) null else customTag) }
+                            )
                         }
                     }
                 }
             }
         },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddMenuSheet = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = CircleShape,
-                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp)
+        bottomBar = {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = Color(0xFF141519),
+                border = BorderStroke(1.dp, Color(0xFF22242C))
             ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add Account",
-                    modifier = Modifier.size(24.dp)
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceAround,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    BottomBarItem(
+                        icon = Icons.Default.Home,
+                        label = "Tokens",
+                        isSelected = true,
+                        onClick = {}
+                    )
+                    BottomBarItem(
+                        icon = Icons.Outlined.QrCodeScanner,
+                        label = "Scan",
+                        isSelected = false,
+                        onClick = onScanQrClicked
+                    )
+                    BottomBarItem(
+                        icon = Icons.Outlined.AddCircleOutline,
+                        label = "Add",
+                        isSelected = false,
+                        onClick = onAddAccountClicked
+                    )
+                    BottomBarItem(
+                        icon = Icons.Outlined.Settings,
+                        label = "Settings",
+                        isSelected = false,
+                        onClick = onSettingsClicked
+                    )
+                }
             }
         }
     ) { innerPadding ->
@@ -914,19 +945,19 @@ fun TokenListScreen(
                         text = if (state.searchQuery.isEmpty() && state.selectedTag == null) "No Accounts" else "No matching accounts",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = Color.White
                     )
 
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Text(
                         text = if (state.searchQuery.isEmpty() && state.selectedTag == null) {
-                            "Tap + to scan a QR code or enter a setup key."
+                            "Tap Add or Scan below to add your first 2FA code."
                         } else {
                             "Check for typos or clear your active filters."
                         },
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = Color(0xFF8E929E),
                         textAlign = TextAlign.Center
                     )
 
@@ -935,10 +966,10 @@ fun TokenListScreen(
 
                         Button(
                             onClick = onScanQrClicked,
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(24.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
+                                containerColor = org.warifu.ui.theme.SakuraPink,
+                                contentColor = Color.White
                             )
                         ) {
                             Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -948,10 +979,10 @@ fun TokenListScreen(
                     }
                 }
             } else {
-                // High-density, clean token list
+                // High-density, clean token list matching Screen 2 in ui.png
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(
@@ -962,9 +993,9 @@ fun TokenListScreen(
                             token = token,
                             isConcealed = state.areCodesConcealed,
                             isIndividuallyRevealed = state.revealedTokenIds.contains(token.id),
+                            onClick = { onSelectToken(token) },
                             onCopyCode = onCopyCode,
                             onTogglePin = { onTogglePin(token.id) },
-                            onQuickReveal = { onQuickReveal(token.id) },
                             onEdit = { tokenToEdit = token },
                             onDelete = { tokenToDelete = token }
                         )
@@ -974,6 +1005,66 @@ fun TokenListScreen(
         }
     }
 }
+
+@Composable
+private fun FilterPill(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(20.dp)
+    Surface(
+        onClick = onClick,
+        shape = shape,
+        color = if (isSelected) org.warifu.ui.theme.SakuraPink else Color(0xFF1C1D22),
+        border = if (isSelected) null else BorderStroke(1.dp, Color(0xFF262832))
+    ) {
+        Text(
+            text = label,
+            fontSize = 13.sp,
+            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+            color = if (isSelected) Color.White else Color(0xFF8E929E),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+        )
+    }
+}
+
+@Composable
+private fun BottomBarItem(
+    icon: ImageVector,
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val activeColor = org.warifu.ui.theme.SakuraPink
+    val inactiveColor = Color(0xFF8E929E)
+    val color = if (isSelected) activeColor else inactiveColor
+
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier.size(56.dp)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = color,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                text = label,
+                fontSize = 11.sp,
+                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                color = color
+            )
+        }
+    }
+}
+
 
 @Composable
 private fun AddActionRow(
