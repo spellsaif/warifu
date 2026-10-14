@@ -15,7 +15,7 @@ fun WarifuLogo(
     size: Dp = 96.dp
 ) {
     Image(
-        painter = painterResource(id = R.drawable.ic_warifu_logo),
+        painter = painterResource(id = R.drawable.warifu_logo),
         contentDescription = "Warifu Logo",
         modifier = modifier.size(size)
     )
