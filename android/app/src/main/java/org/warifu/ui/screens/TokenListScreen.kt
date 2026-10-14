@@ -2,6 +2,8 @@ package org.warifu.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -17,6 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
@@ -30,6 +34,8 @@ import org.warifu.ui.components.ServiceAvatar
 import org.warifu.ui.components.TokenCard
 import org.warifu.ui.components.WarifuLogo
 import org.warifu.ui.model.PendingAccount
+import org.warifu.ui.theme.StatusCritical
+import org.warifu.ui.theme.StatusSuccess
 import org.warifu.ui.theme.StatusWarning
 import org.warifu.ui.viewmodel.AuthUiState
 import org.warifu.ui.viewmodel.TokenSortOrder
@@ -62,10 +68,13 @@ fun TokenListScreen(
     onSelectToken: (TokenView) -> Unit = {},
     onAddAccountClicked: () -> Unit = onScanQrClicked,
     onSettingsClicked: () -> Unit = onLockClicked,
+    onAddCategory: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
-    var showSortMenu by remember { mutableStateOf(false) }
+    var showSortSubMenu by remember { mutableStateOf(false) }
+    var showAddCategoryDialog by remember { mutableStateOf(false) }
+    var newCategoryText by remember { mutableStateOf("") }
     var showAddMenuSheet by remember { mutableStateOf(false) }
     var isSearchActive by remember { mutableStateOf(false) }
 
@@ -109,6 +118,83 @@ fun TokenListScreen(
         )
     }
 
+    // Add Custom Category Dialog
+    if (showAddCategoryDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showAddCategoryDialog = false
+                newCategoryText = ""
+            },
+            containerColor = Color(0xFF141417),
+            titleContentColor = Color(0xFFFAFAFA),
+            textContentColor = Color(0xFFA1A1AA),
+            shape = RoundedCornerShape(16.dp),
+            title = {
+                Text(
+                    text = "New Category",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Create a custom tab to organize your 2FA accounts.",
+                        fontSize = 13.sp,
+                        color = Color(0xFFA1A1AA)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = newCategoryText,
+                        onValueChange = { newCategoryText = it },
+                        placeholder = { Text("e.g. Gaming, Finance, Dev", color = Color(0xFF71717A), fontSize = 14.sp) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFFFAFAFA),
+                            unfocusedBorderColor = Color(0xFF27272A),
+                            focusedTextColor = Color(0xFFFAFAFA),
+                            unfocusedTextColor = Color(0xFFFAFAFA),
+                            cursorColor = Color(0xFFFAFAFA)
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val trimmed = newCategoryText.trim()
+                        if (trimmed.isNotEmpty()) {
+                            onAddCategory(trimmed)
+                            onTagSelected(trimmed)
+                        }
+                        showAddCategoryDialog = false
+                        newCategoryText = ""
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Color(0xFF09090B)
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    enabled = newCategoryText.isNotBlank()
+                ) {
+                    Text("Add", fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showAddCategoryDialog = false
+                        newCategoryText = ""
+                    }
+                ) {
+                    Text("Cancel", color = Color(0xFFA1A1AA))
+                }
+            }
+        )
+    }
+
     // Edit Existing Account Sheet
     tokenToEdit?.let { token ->
         var editIssuer by remember(token) { mutableStateOf(token.issuer) }
@@ -117,8 +203,17 @@ fun TokenListScreen(
 
         ModalBottomSheet(
             onDismissRequest = { tokenToEdit = null },
-            containerColor = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+            containerColor = Color(0xFF141417),
+            dragHandle = {
+                Surface(
+                    modifier = Modifier.padding(vertical = 10.dp),
+                    color = Color(0xFF3F3F46),
+                    shape = RoundedCornerShape(3.dp)
+                ) {
+                    Box(modifier = Modifier.size(width = 36.dp, height = 4.dp))
+                }
+            },
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -126,62 +221,75 @@ fun TokenListScreen(
                     .padding(horizontal = 24.dp)
                     .padding(bottom = 36.dp)
             ) {
-                Text(
-                    text = "Edit Account",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    ServiceAvatar(
+                        issuer = editIssuer,
+                        accountName = editAccount,
+                        size = 46.dp
+                    )
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column {
+                        Text(
+                            text = "Edit Account",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFAFAFA)
+                        )
+                        Text(
+                            text = "Update service name, account label, or category",
+                            fontSize = 12.sp,
+                            color = Color(0xFFA1A1AA)
+                        )
+                    }
+                }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
-                OutlinedTextField(
+                SheetInputField(
                     value = editIssuer,
                     onValueChange = { editIssuer = it },
-                    label = { Text("Service Name") },
-                    placeholder = { Text("e.g. GitHub") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
+                    label = "Service Name",
+                    placeholder = "e.g. GitHub"
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                OutlinedTextField(
+                SheetInputField(
                     value = editAccount,
                     onValueChange = { editAccount = it },
-                    label = { Text("Account Name / Email") },
-                    placeholder = { Text("e.g. user@gmail.com") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
+                    label = "Account Name / Email",
+                    placeholder = "e.g. user@gmail.com"
                 )
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Tag Selector
                 Text(
                     text = "Category / Folder",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFFA1A1AA)
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf("Personal", "Work", "Finance", "Social", "Dev").forEach { tagOption ->
-                        FilterChip(
-                            selected = editTag == tagOption,
-                            onClick = { editTag = if (editTag == tagOption) "" else tagOption },
-                            label = { Text(tagOption, fontSize = 12.sp) }
+                    val editCategories = (listOf("Personal", "Work", "Crypto") + state.customCategories).distinct()
+                    editCategories.forEach { tagOption ->
+                        SheetSelectPill(
+                            label = tagOption,
+                            isSelected = editTag.equals(tagOption, ignoreCase = true),
+                            onClick = { editTag = if (editTag.equals(tagOption, ignoreCase = true)) "" else tagOption }
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(28.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -192,9 +300,14 @@ fun TokenListScreen(
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color(0xFF27272A)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color(0xFF18181C),
+                            contentColor = Color(0xFFA1A1AA)
+                        )
                     ) {
-                        Text("Cancel")
+                        Text("Cancel", fontWeight = FontWeight.Medium)
                     }
 
                     Button(
@@ -212,14 +325,16 @@ fun TokenListScreen(
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
+                            containerColor = Color.White,
+                            contentColor = Color(0xFF09090B),
+                            disabledContainerColor = Color(0xFF242429),
+                            disabledContentColor = Color(0xFF71717A)
                         ),
                         enabled = editIssuer.isNotBlank() || editAccount.isNotBlank()
                     ) {
-                        Text("Save")
+                        Text("Save Changes", fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -232,8 +347,17 @@ fun TokenListScreen(
             // Google Migration Preview & Confirmation Sheet
             ModalBottomSheet(
                 onDismissRequest = { onPendingAccountChange(null) },
-                containerColor = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+                containerColor = Color(0xFF141417),
+                dragHandle = {
+                    Surface(
+                        modifier = Modifier.padding(vertical = 10.dp),
+                        color = Color(0xFF3F3F46),
+                        shape = RoundedCornerShape(3.dp)
+                    ) {
+                        Box(modifier = Modifier.size(width = 36.dp, height = 4.dp))
+                    }
+                },
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
             ) {
                 Column(
                     modifier = Modifier
@@ -245,7 +369,7 @@ fun TokenListScreen(
                         text = "Import Google Authenticator",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = Color(0xFFFAFAFA)
                     )
 
                     Spacer(modifier = Modifier.height(6.dp))
@@ -258,7 +382,7 @@ fun TokenListScreen(
                             "Found ${pending.migrationPreviews.size} accounts ready to import:"
                         },
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = Color(0xFFA1A1AA)
                     )
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -272,9 +396,9 @@ fun TokenListScreen(
                     ) {
                         items(pending.migrationPreviews) { item ->
                             Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0xFF18181C),
+                                border = BorderStroke(1.dp, Color(0xFF27272A)),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Row(
@@ -286,15 +410,16 @@ fun TokenListScreen(
                                     ServiceAvatar(issuer = item.issuer, accountName = item.accountName, size = 32.dp)
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(item.issuer, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                                        Text(item.issuer, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color(0xFFFAFAFA))
                                         if (item.accountName.isNotBlank()) {
-                                            Text(item.accountName, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text(item.accountName, fontSize = 12.sp, color = Color(0xFFA1A1AA))
                                         }
                                     }
                                     if (item.isDuplicate) {
                                         Surface(
                                             shape = RoundedCornerShape(4.dp),
-                                            color = StatusWarning.copy(alpha = 0.15f)
+                                            color = StatusWarning.copy(alpha = 0.15f),
+                                            border = BorderStroke(1.dp, StatusWarning.copy(alpha = 0.35f))
                                         ) {
                                             Text(
                                                 text = "Exists",
@@ -321,9 +446,14 @@ fun TokenListScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(48.dp),
-                            shape = RoundedCornerShape(10.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, Color(0xFF27272A)),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = Color(0xFF18181C),
+                                contentColor = Color(0xFFA1A1AA)
+                            )
                         ) {
-                            Text("Cancel")
+                            Text("Cancel", fontWeight = FontWeight.Medium)
                         }
 
                         Button(
@@ -334,13 +464,13 @@ fun TokenListScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(48.dp),
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
+                                containerColor = Color.White,
+                                contentColor = Color(0xFF09090B)
                             )
                         ) {
-                            Text("Import All (${pending.migrationPreviews.size})")
+                            Text("Import All (${pending.migrationPreviews.size})", fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -383,8 +513,17 @@ fun TokenListScreen(
 
             ModalBottomSheet(
                 onDismissRequest = { onPendingAccountChange(null) },
-                containerColor = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+                containerColor = Color(0xFF141417),
+                dragHandle = {
+                    Surface(
+                        modifier = Modifier.padding(vertical = 10.dp),
+                        color = Color(0xFF3F3F46),
+                        shape = RoundedCornerShape(3.dp)
+                    ) {
+                        Box(modifier = Modifier.size(width = 36.dp, height = 4.dp))
+                    }
+                },
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
             ) {
                 Column(
                     modifier = Modifier
@@ -392,27 +531,46 @@ fun TokenListScreen(
                         .padding(horizontal = 24.dp)
                         .padding(bottom = 36.dp)
                 ) {
-                    Text(
-                        text = "Add 2FA Account",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    // Hero Header with Live Vector Service Avatar
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        ServiceAvatar(
+                            issuer = issuerInput,
+                            accountName = accountInput,
+                            size = 46.dp
+                        )
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column {
+                            Text(
+                                text = if (issuerInput.isBlank()) "Add 2FA Account" else issuerInput,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFAFAFA)
+                            )
+                            Text(
+                                text = "Enter secret key or review details",
+                                fontSize = 12.sp,
+                                color = Color(0xFFA1A1AA)
+                            )
+                        }
+                    }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(18.dp))
 
                     // Duplicate Warning Banner
                     if (duplicateFound != null) {
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = StatusWarning.copy(alpha = 0.12f),
-                            border = BorderStroke(1.dp, StatusWarning.copy(alpha = 0.4f)),
+                            border = BorderStroke(1.dp, StatusWarning.copy(alpha = 0.35f)),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(bottom = 12.dp)
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(Icons.Default.Warning, contentDescription = null, tint = StatusWarning, modifier = Modifier.size(16.dp))
@@ -420,131 +578,136 @@ fun TokenListScreen(
                                 Text(
                                     text = "An account for \"${duplicateFound.issuer}\" already exists in your vault.",
                                     fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = Color(0xFFFAFAFA)
                                 )
                             }
                         }
                     }
 
-                    OutlinedTextField(
+                    SheetInputField(
                         value = issuerInput,
                         onValueChange = { issuerInput = it },
-                        label = { Text("Service Name") },
-                        placeholder = { Text("e.g. GitHub, Google, Discord") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
+                        label = "Service Name",
+                        placeholder = "e.g. GitHub, Google, Discord"
                     )
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    OutlinedTextField(
+                    SheetInputField(
                         value = accountInput,
                         onValueChange = { accountInput = it },
-                        label = { Text("Account Name or Email (Optional)") },
-                        placeholder = { Text("e.g. user@gmail.com") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
+                        label = "Account Name / Email (Optional)",
+                        placeholder = "e.g. user@gmail.com"
                     )
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    OutlinedTextField(
+                    SheetInputField(
                         value = secretInput,
                         onValueChange = { secretInput = it },
-                        label = { Text("Secret Key") },
-                        placeholder = { Text("Base32 secret key") },
-                        singleLine = true,
+                        label = "Secret Key",
+                        placeholder = "Base32 secret key",
                         isError = secretError != null,
                         supportingText = {
                             if (secretError != null) {
-                                Text(secretError, color = MaterialTheme.colorScheme.error)
+                                Text(secretError, color = StatusCritical, fontSize = 11.sp)
                             } else {
-                                Text("Letters A-Z and digits 2-7. Spaces are automatically stripped.")
+                                Text("Letters A-Z and digits 2-7. Spaces are automatically stripped.", color = Color(0xFF71717A), fontSize = 11.sp)
                             }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
+                        }
                     )
 
                     // Live Code Preview Pill
                     if (livePreviewCode != null) {
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFF18181C),
+                            border = BorderStroke(1.dp, Color(0xFF27272A)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = "Live Code Preview:",
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(StatusSuccess)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Live Preview:",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color(0xFFA1A1AA)
+                                    )
+                                }
                                 Text(
                                     text = livePreviewCode,
-                                    fontSize = 16.sp,
+                                    fontSize = 17.sp,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = FontFamily.Monospace,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    letterSpacing = 1.sp,
+                                    color = Color(0xFFFAFAFA)
                                 )
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                    // Token Type Selection Chips
-                    Text("Type", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.height(4.dp))
+                    // Token Type Selection Pills
+                    Text("Type", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color(0xFFA1A1AA))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        FilterChip(
-                            selected = !isSteamType && selectedPeriod == 30,
-                            onClick = { isSteamType = false; selectedPeriod = 30 },
-                            label = { Text("TOTP (30s)", fontSize = 12.sp) }
+                        SheetSelectPill(
+                            label = "TOTP (30s)",
+                            isSelected = !isSteamType && selectedPeriod == 30,
+                            onClick = { isSteamType = false; selectedPeriod = 30 }
                         )
-                        FilterChip(
-                            selected = isSteamType,
-                            onClick = { isSteamType = true },
-                            label = { Text("Steam Guard", fontSize = 12.sp) }
+                        SheetSelectPill(
+                            label = "Steam Guard",
+                            isSelected = isSteamType,
+                            onClick = { isSteamType = true }
                         )
-                        FilterChip(
-                            selected = !isSteamType && selectedPeriod == 60,
-                            onClick = { isSteamType = false; selectedPeriod = 60 },
-                            label = { Text("TOTP (60s)", fontSize = 12.sp) }
+                        SheetSelectPill(
+                            label = "TOTP (60s)",
+                            isSelected = !isSteamType && selectedPeriod == 60,
+                            onClick = { isSteamType = false; selectedPeriod = 60 }
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    // Category Tags
-                    Text("Category / Folder", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.height(4.dp))
+                    // Category Tags Pills
+                    Text("Category / Folder", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color(0xFFA1A1AA))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        listOf("Personal", "Work", "Finance", "Social", "Dev").forEach { tagOption ->
-                            FilterChip(
-                                selected = selectedTagInput == tagOption,
-                                onClick = { selectedTagInput = if (selectedTagInput == tagOption) "" else tagOption },
-                                label = { Text(tagOption, fontSize = 12.sp) }
+                        val availableCategories = (listOf("Personal", "Work", "Crypto") + state.customCategories).distinct()
+                        availableCategories.forEach { tagOption ->
+                            SheetSelectPill(
+                                label = tagOption,
+                                isSelected = selectedTagInput.equals(tagOption, ignoreCase = true),
+                                onClick = {
+                                    selectedTagInput = if (selectedTagInput.equals(tagOption, ignoreCase = true)) "" else tagOption
+                                }
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(26.dp))
 
                     val canSave = (issuerInput.isNotBlank() || accountInput.isNotBlank()) &&
                             secretInput.isNotBlank() &&
@@ -559,9 +722,14 @@ fun TokenListScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(48.dp),
-                            shape = RoundedCornerShape(10.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, Color(0xFF27272A)),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = Color(0xFF18181C),
+                                contentColor = Color(0xFFA1A1AA)
+                            )
                         ) {
-                            Text("Cancel")
+                            Text("Cancel", fontWeight = FontWeight.Medium)
                         }
 
                         Button(
@@ -580,14 +748,16 @@ fun TokenListScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(48.dp),
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
+                                containerColor = Color.White,
+                                contentColor = Color(0xFF09090B),
+                                disabledContainerColor = Color(0xFF242429),
+                                disabledContentColor = Color(0xFF71717A)
                             ),
                             enabled = canSave
                         ) {
-                            Text("Save Account")
+                            Text("Save Account", fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -599,8 +769,17 @@ fun TokenListScreen(
     if (showAddMenuSheet) {
         ModalBottomSheet(
             onDismissRequest = { showAddMenuSheet = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+            containerColor = Color(0xFF141417),
+            dragHandle = {
+                Surface(
+                    modifier = Modifier.padding(vertical = 10.dp),
+                    color = Color(0xFF3F3F46),
+                    shape = RoundedCornerShape(3.dp)
+                ) {
+                    Box(modifier = Modifier.size(width = 36.dp, height = 4.dp))
+                }
+            },
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -612,7 +791,7 @@ fun TokenListScreen(
                     text = "Add Account",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = Color(0xFFFAFAFA)
                 )
 
                 Spacer(modifier = Modifier.height(18.dp))
@@ -656,17 +835,22 @@ fun TokenListScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = Color(0xFF09090B),
         topBar = {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp)
             ) {
+                // Professional Monochromatic Header
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
+                    // Left Brand: Logo + Warifu Title + Count Badge
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         WarifuLogo(size = 28.dp)
                         Spacer(modifier = Modifier.width(10.dp))
@@ -674,143 +858,227 @@ fun TokenListScreen(
                             text = "Warifu",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
+                            letterSpacing = (-0.5).sp,
+                            color = Color(0xFFFAFAFA)
                         )
                         if (state.tokens.isNotEmpty()) {
                             Spacer(modifier = Modifier.width(8.dp))
                             Surface(
                                 shape = RoundedCornerShape(10.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant
+                                color = Color(0xFF18181B),
+                                border = BorderStroke(1.dp, Color(0xFF27272A))
                             ) {
                                 Text(
                                     text = "${state.tokens.size}",
                                     fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFFA1A1AA),
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                                 )
                             }
                         }
                     }
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Right Actions: Search + Polished Three-Dots Menu
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         // Search icon
-                        IconButton(onClick = {
-                            isSearchActive = !isSearchActive
-                            if (!isSearchActive) onSearchChanged("")
-                        }) {
+                        IconButton(
+                            onClick = {
+                                isSearchActive = !isSearchActive
+                                if (!isSearchActive) onSearchChanged("")
+                            },
+                            modifier = Modifier.size(38.dp)
+                        ) {
                             Icon(
                                 imageVector = if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
                                 contentDescription = "Search accounts",
-                                tint = MaterialTheme.colorScheme.onSurface
+                                tint = if (isSearchActive) Color.White else Color(0xFFA1A1AA),
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        // Sort icon & dropdown
+                        // Polished Three-Dots Menu Popover
                         Box {
-                            IconButton(onClick = { showSortMenu = true }) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Sort,
-                                    contentDescription = "Sort accounts",
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                            DropdownMenu(
-                                expanded = showSortMenu,
-                                onDismissRequest = { showSortMenu = false }
+                            IconButton(
+                                onClick = {
+                                    showMenu = true
+                                    showSortSubMenu = false
+                                },
+                                modifier = Modifier.size(38.dp)
                             ) {
-                                DropdownMenuItem(
-                                    text = { Text("Service (A → Z)") },
-                                    leadingIcon = { if (state.sortOrder == TokenSortOrder.ISSUER_ASC) Icon(Icons.Default.Check, null) },
-                                    onClick = {
-                                        onSortOrderChanged(TokenSortOrder.ISSUER_ASC)
-                                        showSortMenu = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Service (Z → A)") },
-                                    leadingIcon = { if (state.sortOrder == TokenSortOrder.ISSUER_DESC) Icon(Icons.Default.Check, null) },
-                                    onClick = {
-                                        onSortOrderChanged(TokenSortOrder.ISSUER_DESC)
-                                        showSortMenu = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Account Name (A → Z)") },
-                                    leadingIcon = { if (state.sortOrder == TokenSortOrder.ACCOUNT_ASC) Icon(Icons.Default.Check, null) },
-                                    onClick = {
-                                        onSortOrderChanged(TokenSortOrder.ACCOUNT_ASC)
-                                        showSortMenu = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Expiring Soon First") },
-                                    leadingIcon = { if (state.sortOrder == TokenSortOrder.EXPIRING_SOON) Icon(Icons.Default.Check, null) },
-                                    onClick = {
-                                        onSortOrderChanged(TokenSortOrder.EXPIRING_SOON)
-                                        showSortMenu = false
-                                    }
-                                )
-                            }
-                        }
-
-                        // Conceal codes icon
-                        IconButton(onClick = onToggleConceal) {
-                            Icon(
-                                imageVector = if (state.areCodesConcealed) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                contentDescription = "Toggle conceal codes",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        // Lock vault icon
-                        IconButton(onClick = onLockClicked) {
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = "Lock vault",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        // More options
-                        Box {
-                            IconButton(onClick = { showMenu = true }) {
                                 Icon(
                                     imageVector = Icons.Default.MoreVert,
                                     contentDescription = "Options menu",
-                                    tint = MaterialTheme.colorScheme.onSurface
+                                    tint = Color(0xFFA1A1AA),
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
 
-                            DropdownMenu(
-                                expanded = showMenu,
-                                onDismissRequest = { showMenu = false }
+                            MaterialTheme(
+                                colorScheme = MaterialTheme.colorScheme.copy(
+                                    surface = Color(0xFF141417)
+                                )
                             ) {
-                                DropdownMenuItem(
-                                    text = { Text("Scan QR Code") },
-                                    leadingIcon = { Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                                    onClick = {
+                                DropdownMenu(
+                                    expanded = showMenu,
+                                    onDismissRequest = {
                                         showMenu = false
-                                        onScanQrClicked()
+                                        showSortSubMenu = false
+                                    },
+                                    modifier = Modifier
+                                        .width(220.dp)
+                                        .background(Color(0xFF141417), RoundedCornerShape(14.dp))
+                                        .border(BorderStroke(1.dp, Color(0xFF27272A)), RoundedCornerShape(14.dp))
+                                ) {
+                                    if (showSortSubMenu) {
+                                        DropdownMenuItem(
+                                            text = { Text("Back", fontSize = 13.sp, color = Color(0xFFA1A1AA)) },
+                                            leadingIcon = {
+                                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color(0xFFA1A1AA), modifier = Modifier.size(16.dp))
+                                            },
+                                            onClick = { showSortSubMenu = false }
+                                        )
+                                        HorizontalDivider(color = Color(0xFF27272A), thickness = 0.5.dp)
+                                        DropdownMenuItem(
+                                            text = { Text("Service (A → Z)", fontSize = 13.sp, color = Color(0xFFFAFAFA)) },
+                                            leadingIcon = {
+                                                if (state.sortOrder == TokenSortOrder.ISSUER_ASC) {
+                                                    Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                                } else {
+                                                    Spacer(modifier = Modifier.size(16.dp))
+                                                }
+                                            },
+                                            onClick = {
+                                                onSortOrderChanged(TokenSortOrder.ISSUER_ASC)
+                                                showMenu = false
+                                                showSortSubMenu = false
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Service (Z → A)", fontSize = 13.sp, color = Color(0xFFFAFAFA)) },
+                                            leadingIcon = {
+                                                if (state.sortOrder == TokenSortOrder.ISSUER_DESC) {
+                                                    Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                                } else {
+                                                    Spacer(modifier = Modifier.size(16.dp))
+                                                }
+                                            },
+                                            onClick = {
+                                                onSortOrderChanged(TokenSortOrder.ISSUER_DESC)
+                                                showMenu = false
+                                                showSortSubMenu = false
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Account Name (A → Z)", fontSize = 13.sp, color = Color(0xFFFAFAFA)) },
+                                            leadingIcon = {
+                                                if (state.sortOrder == TokenSortOrder.ACCOUNT_ASC) {
+                                                    Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                                } else {
+                                                    Spacer(modifier = Modifier.size(16.dp))
+                                                }
+                                            },
+                                            onClick = {
+                                                onSortOrderChanged(TokenSortOrder.ACCOUNT_ASC)
+                                                showMenu = false
+                                                showSortSubMenu = false
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Expiring Soon First", fontSize = 13.sp, color = Color(0xFFFAFAFA)) },
+                                            leadingIcon = {
+                                                if (state.sortOrder == TokenSortOrder.EXPIRING_SOON) {
+                                                    Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                                } else {
+                                                    Spacer(modifier = Modifier.size(16.dp))
+                                                }
+                                            },
+                                            onClick = {
+                                                onSortOrderChanged(TokenSortOrder.EXPIRING_SOON)
+                                                showMenu = false
+                                                showSortSubMenu = false
+                                            }
+                                        )
+                                    } else {
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    text = if (state.areCodesConcealed) "Reveal Codes" else "Conceal Codes",
+                                                    fontSize = 13.sp,
+                                                    color = Color(0xFFFAFAFA)
+                                                )
+                                            },
+                                            leadingIcon = {
+                                                Icon(
+                                                    imageVector = if (state.areCodesConcealed) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFFA1A1AA),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            },
+                                            onClick = {
+                                                showMenu = false
+                                                onToggleConceal()
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Sort Accounts...", fontSize = 13.sp, color = Color(0xFFFAFAFA)) },
+                                            leadingIcon = {
+                                                Icon(
+                                                    imageVector = Icons.AutoMirrored.Filled.Sort,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFFA1A1AA),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            },
+                                            trailingIcon = {
+                                                Icon(
+                                                    imageVector = Icons.Default.ChevronRight,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFF71717A),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            },
+                                            onClick = {
+                                                showSortSubMenu = true
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("New Category", fontSize = 13.sp, color = Color(0xFFFAFAFA)) },
+                                            leadingIcon = {
+                                                Icon(
+                                                    imageVector = Icons.Default.Add,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFFA1A1AA),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            },
+                                            onClick = {
+                                                showMenu = false
+                                                showAddCategoryDialog = true
+                                            }
+                                        )
+                                        HorizontalDivider(color = Color(0xFF27272A), thickness = 0.5.dp)
+                                        DropdownMenuItem(
+                                            text = { Text("Lock Vault", fontSize = 13.sp, color = Color(0xFFFAFAFA)) },
+                                            leadingIcon = {
+                                                Icon(
+                                                    imageVector = Icons.Default.Lock,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFFA1A1AA),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            },
+                                            onClick = {
+                                                showMenu = false
+                                                onLockClicked()
+                                            }
+                                        )
                                     }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Enter Setup Key") },
-                                    leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                                    onClick = {
-                                        showMenu = false
-                                        onPendingAccountChange(PendingAccount())
-                                    }
-                                )
-                                HorizontalDivider()
-                                DropdownMenuItem(
-                                    text = { Text("Lock Vault Now") },
-                                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                                    onClick = {
-                                        showMenu = false
-                                        onLockClicked()
-                                    }
-                                )
+                                }
                             }
                         }
                     }
@@ -822,103 +1090,147 @@ fun TokenListScreen(
                         OutlinedTextField(
                             value = state.searchQuery,
                             onValueChange = onSearchChanged,
-                            placeholder = { Text("Search accounts or tags...", fontSize = 14.sp) },
+                            placeholder = { Text("Search accounts or tags...", fontSize = 14.sp, color = Color(0xFF71717A)) },
                             leadingIcon = {
-                                Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFFA1A1AA), modifier = Modifier.size(18.dp))
                             },
                             trailingIcon = {
                                 if (state.searchQuery.isNotEmpty()) {
                                     IconButton(onClick = { onSearchChanged("") }) {
-                                        Icon(Icons.Default.Clear, contentDescription = "Clear search", modifier = Modifier.size(16.dp))
+                                        Icon(Icons.Default.Clear, contentDescription = "Clear search", tint = Color(0xFFA1A1AA), modifier = Modifier.size(16.dp))
                                     }
                                 }
                             },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFFFAFAFA),
+                                unfocusedBorderColor = Color(0xFF27272A),
+                                focusedTextColor = Color(0xFFFAFAFA),
+                                unfocusedTextColor = Color(0xFFFAFAFA),
+                                cursorColor = Color(0xFFFAFAFA),
+                                focusedContainerColor = Color(0xFF121215),
+                                unfocusedContainerColor = Color(0xFF121215)
+                            ),
                             shape = RoundedCornerShape(10.dp)
                         )
                     }
                 }
 
-                // Horizontal Category / Tag Filters row (Screen 2 ui.png)
+                // Horizontal Category / Tag Filters row with custom categories & + button
                 if (state.tokens.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val predefinedCategories = listOf("All", "Personal", "Work", "Crypto")
-                        predefinedCategories.forEach { category ->
-                            val isSelected = if (category == "All") state.selectedTag == null || state.selectedTag == "All"
-                            else state.selectedTag.equals(category, ignoreCase = true)
+                        // "All" is always first
+                        val isAllSelected = state.selectedTag == null || state.selectedTag == "All"
+                        FilterPill(
+                            label = "All",
+                            isSelected = isAllSelected,
+                            onClick = { onTagSelected(null) }
+                        )
 
+                        // Custom Categories & Token tags
+                        val allCategories = (state.customCategories + state.tokens.flatMap { it.tags })
+                            .distinct()
+                            .filterNot { it.equals("All", ignoreCase = true) }
+
+                        allCategories.forEach { category ->
+                            val isSelected = state.selectedTag.equals(category, ignoreCase = true)
                             FilterPill(
                                 label = category,
                                 isSelected = isSelected,
                                 onClick = {
-                                    if (category == "All") onTagSelected(null)
-                                    else onTagSelected(if (isSelected) null else category)
+                                    onTagSelected(if (isSelected) null else category)
                                 }
                             )
                         }
 
-                        // Any dynamic custom tags from user's accounts
-                        val extraTags = state.tokens.flatMap { it.tags }
-                            .distinct()
-                            .filterNot { tag -> predefinedCategories.any { it.equals(tag, ignoreCase = true) } }
-
-                        extraTags.forEach { customTag ->
-                            val isSelected = state.selectedTag.equals(customTag, ignoreCase = true)
-                            FilterPill(
-                                label = customTag,
-                                isSelected = isSelected,
-                                onClick = { onTagSelected(if (isSelected) null else customTag) }
-                            )
+                        // "+ New" Custom Category Chip Button
+                        Surface(
+                            onClick = { showAddCategoryDialog = true },
+                            shape = RoundedCornerShape(20.dp),
+                            color = Color(0xFF141417),
+                            border = BorderStroke(1.dp, Color(0xFF27272A))
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "Add custom category",
+                                    tint = Color(0xFFA1A1AA),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "New",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFFA1A1AA)
+                                )
+                            }
                         }
                     }
                 }
             }
         },
         bottomBar = {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = Color(0xFF141519),
-                border = BorderStroke(1.dp, Color(0xFF22242C))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 10.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Row(
+                Surface(
+                    shape = RoundedCornerShape(28.dp),
+                    color = Color(0xF5141418),
+                    border = BorderStroke(1.dp, Color(0xFF27272F)),
+                    shadowElevation = 8.dp,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceAround,
-                    verticalAlignment = Alignment.CenterVertically
+                        .height(60.dp)
                 ) {
-                    BottomBarItem(
-                        icon = Icons.Default.Home,
-                        label = "Tokens",
-                        isSelected = true,
-                        onClick = {}
-                    )
-                    BottomBarItem(
-                        icon = Icons.Outlined.QrCodeScanner,
-                        label = "Scan",
-                        isSelected = false,
-                        onClick = onScanQrClicked
-                    )
-                    BottomBarItem(
-                        icon = Icons.Outlined.AddCircleOutline,
-                        label = "Add",
-                        isSelected = false,
-                        onClick = onAddAccountClicked
-                    )
-                    BottomBarItem(
-                        icon = Icons.Outlined.Settings,
-                        label = "Settings",
-                        isSelected = false,
-                        onClick = onSettingsClicked
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceAround,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        FloatingDockItem(
+                            icon = Icons.Outlined.Shield,
+                            label = "Tokens",
+                            isSelected = true,
+                            onClick = {}
+                        )
+                        FloatingDockItem(
+                            icon = Icons.Outlined.QrCodeScanner,
+                            label = "Scan",
+                            isSelected = false,
+                            onClick = onScanQrClicked
+                        )
+                        FloatingDockItem(
+                            icon = Icons.Outlined.Add,
+                            label = "Add",
+                            isSelected = false,
+                            onClick = onAddAccountClicked,
+                            isHighlight = true
+                        )
+                        FloatingDockItem(
+                            icon = Icons.Outlined.Settings,
+                            label = "Settings",
+                            isSelected = false,
+                            onClick = onSettingsClicked
+                        )
+                    }
                 }
             }
         }
@@ -968,13 +1280,13 @@ fun TokenListScreen(
                             onClick = onScanQrClicked,
                             shape = RoundedCornerShape(24.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = org.warifu.ui.theme.SakuraPink,
-                                contentColor = Color.White
+                                containerColor = Color.White,
+                                contentColor = Color(0xFF09090B)
                             )
                         ) {
                             Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Scan QR Code")
+                            Text("Scan QR Code", fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -1016,52 +1328,132 @@ private fun FilterPill(
     Surface(
         onClick = onClick,
         shape = shape,
-        color = if (isSelected) org.warifu.ui.theme.SakuraPink else Color(0xFF1C1D22),
-        border = if (isSelected) null else BorderStroke(1.dp, Color(0xFF262832))
+        color = if (isSelected) Color(0xFFFAFAFA) else Color(0xFF141417),
+        border = if (isSelected) null else BorderStroke(1.dp, Color(0xFF27272A))
     ) {
         Text(
             text = label,
             fontSize = 13.sp,
             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-            color = if (isSelected) Color.White else Color(0xFF8E929E),
+            color = if (isSelected) Color(0xFF09090B) else Color(0xFFA1A1AA),
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
         )
     }
 }
 
 @Composable
-private fun BottomBarItem(
+private fun FloatingDockItem(
     icon: ImageVector,
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    isHighlight: Boolean = false
+) {
+    if (isHighlight) {
+        Surface(
+            onClick = onClick,
+            shape = CircleShape,
+            color = Color(0xFF1E1E24),
+            border = BorderStroke(1.dp, Color(0xFF32323D)),
+            modifier = Modifier.size(42.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    } else {
+        val activeColor = Color(0xFFFAFAFA)
+        val inactiveColor = Color(0xFF71717A)
+        val color = if (isSelected) activeColor else inactiveColor
+
+        Surface(
+            onClick = onClick,
+            shape = RoundedCornerShape(20.dp),
+            color = if (isSelected) Color(0xFF222228) else Color.Transparent,
+            modifier = Modifier.height(40.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = color,
+                    modifier = Modifier.size(19.dp)
+                )
+                if (isSelected) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = label,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SheetInputField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    placeholder: String,
+    isError: Boolean = false,
+    supportingText: @Composable (() -> Unit)? = null
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label, fontSize = 13.sp) },
+        placeholder = { Text(placeholder, fontSize = 13.sp, color = Color(0xFF71717A)) },
+        singleLine = true,
+        isError = isError,
+        supportingText = supportingText,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = Color.White,
+            unfocusedBorderColor = Color(0xFF27272A),
+            errorBorderColor = StatusCritical,
+            focusedContainerColor = Color(0xFF18181C),
+            unfocusedContainerColor = Color(0xFF18181C),
+            focusedTextColor = Color(0xFFFAFAFA),
+            unfocusedTextColor = Color(0xFFFAFAFA),
+            focusedLabelColor = Color(0xFFA1A1AA),
+            unfocusedLabelColor = Color(0xFF71717A),
+            cursorColor = Color.White
+        )
+    )
+}
+
+@Composable
+private fun SheetSelectPill(
     label: String,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val activeColor = org.warifu.ui.theme.SakuraPink
-    val inactiveColor = Color(0xFF8E929E)
-    val color = if (isSelected) activeColor else inactiveColor
-
-    IconButton(
+    Surface(
         onClick = onClick,
-        modifier = Modifier.size(56.dp)
+        shape = RoundedCornerShape(12.dp),
+        color = if (isSelected) Color(0xFFFAFAFA) else Color(0xFF18181C),
+        border = if (isSelected) null else BorderStroke(1.dp, Color(0xFF27272A))
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = color,
-                modifier = Modifier.size(22.dp)
-            )
-            Spacer(modifier = Modifier.height(3.dp))
-            Text(
-                text = label,
-                fontSize = 11.sp,
-                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                color = color
-            )
-        }
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+            color = if (isSelected) Color(0xFF09090B) else Color(0xFFA1A1AA),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+        )
     }
 }
 
