@@ -3,25 +3,33 @@ package org.warifu.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // ============================================================================
-// Warifu Palette (Inspired by ui.png & logo.png)
+// True Monochromatic System (Inspired by Linear / Raycast / Apple Keychain)
 // ============================================================================
-val SakuraPink = Color(0xFFFF637E)               // Primary Warifu Sakura Pink
-val SakuraPinkMuted = Color(0xFFFF859B)          // Soft petal highlight
-val SakuraPinkGlow = Color(0x33FF637E)           // Subtle glow / selection tint
-val SakuraDark = Color(0xFFCC4A62)               // Deep pressed state
+val WarifuBackground = Color(0xFF09090B)         // Deep obsidian canvas (Zinc-950)
+val WarifuSurface = Color(0xFF121215)            // Subtle dark card surface
+val WarifuSurfaceElevated = Color(0xFF1A1A1E)    // Elevated dropdowns, dialogs, inputs
+val WarifuBorder = Color(0xFF242429)             // Hairline subtle border
+val WarifuBorderSubtle = Color(0xFF1C1C20)       // Divider stroke
+val WarifuTextPrimary = Color(0xFFFAFAFA)        // Zinc-50 crisp high-contrast white
+val WarifuTextSecondary = Color(0xFFA1A1AA)      // Zinc-400 balanced neutral gray
+val WarifuTextMuted = Color(0xFF71717A)          // Zinc-500 captions
 
-val WarifuBackground = Color(0xFF0B0C0E)         // Deep obsidian background
-val WarifuSurface = Color(0xFF141519)            // Elevated card background
-val WarifuSurfaceElevated = Color(0xFF1C1D22)    // Secondary elevated / interactive surface
-val WarifuBorder = Color(0xFF22242C)             // Subtle hairline border
-val WarifuBorderSubtle = Color(0xFF181A20)       // Divider stroke
-val WarifuTextPrimary = Color(0xFFFFFFFF)        // High contrast primary text
-val WarifuTextSecondary = Color(0xFF8E929E)      // Muted metadata text
-val WarifuTextMuted = Color(0xFF555865)          // Helper captions
+// Monochromatic High-Contrast Actions
+val MonoAction = Color(0xFFFFFFFF)               // Pure white active trigger
+val MonoActionText = Color(0xFF09090B)           // Dark text on white button
+val MonoActionInactive = Color(0xFF18181C)       // Unselected chip surface
+val MonoActionInactiveText = Color(0xFFA1A1AA)   // Unselected chip text
 
-// ============================================================================
-// Monochromatic & Minimalist Palette
-// ============================================================================
+// Subtle Brand Sakura Touch (Optional highlight)
+val SakuraPink = Color(0xFFFF637E)
+val SakuraPinkMuted = Color(0xFFFF859B)
+
+// Functional Semantic Urgency
+val StatusWarning = Color(0xFFF59E0B)            // Amber (under 7s)
+val StatusCritical = Color(0xFFEF4444)           // Red (under 4s & delete action)
+val StatusSuccess = Color(0xFF10B981)            // Emerald
+
+// Backwards compatibility mappings
 val MonoDarkBackground = WarifuBackground
 val MonoDarkSurface = WarifuSurface
 val MonoDarkSurfaceElevated = WarifuSurfaceElevated
@@ -30,12 +38,9 @@ val MonoDarkBorderSubtle = WarifuBorderSubtle
 val MonoDarkTextPrimary = WarifuTextPrimary
 val MonoDarkTextSecondary = WarifuTextSecondary
 val MonoDarkTextMuted = WarifuTextMuted
-val MonoDarkAction = SakuraPink
-val MonoDarkActionText = Color(0xFFFFFFFF)
+val MonoDarkAction = MonoAction
+val MonoDarkActionText = MonoActionText
 
-// ============================================================================
-// Minimalist Light Mode
-// ============================================================================
 val MonoLightBackground = Color(0xFFF9FAFB)
 val MonoLightSurface = Color(0xFFF3F4F6)
 val MonoLightSurfaceElevated = Color(0xFFFFFFFF)
@@ -44,24 +49,17 @@ val MonoLightBorderSubtle = Color(0xFFF4F4F5)
 val MonoLightTextPrimary = Color(0xFF09090B)
 val MonoLightTextSecondary = Color(0xFF52525B)
 val MonoLightTextMuted = Color(0xFFA1A1AA)
-val MonoLightAction = SakuraPink
+val MonoLightAction = Color(0xFF09090B)
 val MonoLightActionText = Color(0xFFFFFFFF)
 
-// ============================================================================
-// Functional Semantic Status (Urgency & Error Only)
-// ============================================================================
-val StatusWarning = Color(0xFFF59E0B) // Amber
-val StatusCritical = Color(0xFFF87171) // Red (under 4 seconds / delete action)
-val StatusSuccess = Color(0xFF10B981) // Emerald
-
-// Backward compatibility tokens
-val PrimaryBlue = SakuraPink
-val AccentCyan = SakuraPinkMuted
-val TimerGreen = SakuraPink
+val PrimaryBlue = MonoAction
+val AccentCyan = MonoActionInactiveText
+val TimerGreen = WarifuTextPrimary
 val TimerAmber = StatusWarning
 val TimerRed = StatusCritical
 val DarkSurface = MonoDarkSurface
 val DarkCard = MonoDarkSurfaceElevated
 val TextPrimary = MonoDarkTextPrimary
 val TextSecondary = MonoDarkTextSecondary
+
 
